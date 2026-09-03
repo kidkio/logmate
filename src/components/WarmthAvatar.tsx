@@ -7,6 +7,7 @@ interface WarmthAvatarProps {
   tier: WarmthTier;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showBadge?: boolean;
+  isLocked?: boolean;
   onClick?: () => void;
   className?: string;
 }
@@ -15,6 +16,7 @@ export function WarmthAvatar({
   tier,
   size = 'md',
   showBadge = true,
+  isLocked = false,
   onClick,
   className = '',
 }: WarmthAvatarProps) {
@@ -31,6 +33,28 @@ export function WarmthAvatar({
     lg: 'text-[10px] px-2 py-0.5 -bottom-2 -right-1',
     xl: 'text-xs px-2.5 py-0.5 -bottom-2 -right-1',
   };
+
+  if (isLocked) {
+    return (
+      <div
+        onClick={onClick}
+        className={`relative inline-flex items-center justify-center rounded-2xl bg-slate-950/80 border-2 border-dashed border-slate-800/80 select-none transition-all flex-shrink-0 opacity-60 ${sizeClasses[size]} ${className}`}
+        title={`Lv.${tier.level} (미달성 잠금)`}
+      >
+        <span className="text-slate-600 filter grayscale select-none text-xs sm:text-sm">
+          🔒
+        </span>
+
+        {showBadge && (
+          <span
+            className={`absolute rounded-full font-black border border-slate-800 bg-slate-900 text-slate-500 shadow font-mono flex items-center justify-center whitespace-nowrap z-10 ${badgeSizeClasses[size]}`}
+          >
+            Lv.{tier.level}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div

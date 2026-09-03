@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Flame, Sparkles, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
+import { X, Flame, Sparkles, CheckCircle2, Lock, ArrowRight, HelpCircle } from 'lucide-react';
 import { WARMTH_TIERS, WarmthProgress } from '@/lib/warmthSystem';
 import { WarmthAvatar } from './WarmthAvatar';
 
@@ -21,7 +21,7 @@ export function WarmthLevelModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
       <div className="glass-card max-w-md w-full p-5 rounded-3xl border border-indigo-500/30 text-left space-y-4 shadow-[0_0_50px_rgba(99,102,241,0.25)] relative max-h-[90vh] overflow-y-auto no-scrollbar">
         {/* 상단 헤더 */}
         <div className="flex items-center justify-between">
@@ -30,8 +30,8 @@ export function WarmthLevelModal({
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-100">온기 레벨 & 프로필 아바타 도감</h3>
-              <p className="text-[10px] text-slate-400">온기를 나눌수록 내 프로필과 칭호가 진화합니다</p>
+              <h3 className="text-sm font-black text-slate-100">온기 레벨 & 아바타 성장 도감 (15단계)</h3>
+              <p className="text-[10px] text-slate-400">온기를 모아 미지의 실루엣을 해금해 보세요</p>
             </div>
           </div>
 
@@ -74,7 +74,7 @@ export function WarmthLevelModal({
                   <strong className="text-slate-200">Lv.{progress.nextTier.level} {progress.nextTier.title}</strong>
                 </span>
                 <span className="font-mono text-amber-300 font-bold">
-                  {progress.warmthToNext} 온기 남음 ({progress.progressPct}%)
+                  {progress.warmthToNext}개 남음 ({progress.progressPct}%)
                 </span>
               </div>
               <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden border border-white/[0.06]">
@@ -89,21 +89,28 @@ export function WarmthLevelModal({
           {progress.isMaxLevel && (
             <div className="p-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-center">
               <span className="text-xs font-bold text-yellow-300">
-                👑 최고 레벨에 도달하셨습니다! 영원한 온기의 수호자이십니다.
+                👑 최종 15단계에 도달하셨습니다! 당신은 밤하늘 영원한 온기의 신화입니다.
               </span>
             </div>
           )}
         </div>
 
-        {/* 6단계 레벨 도감 리스트 */}
+        {/* 15단계 레벨 도감 리스트 (미달성 등급 디자인 비공개) */}
         <div className="space-y-2 pt-1">
-          <span className="text-[11px] font-bold text-slate-400 block px-1">
-            전체 온기 등급 및 혜택
-          </span>
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11px] font-bold text-slate-400 block">
+              전체 15단계 성장 도감
+            </span>
+            <span className="text-[10px] text-slate-500 flex items-center gap-1">
+              <Lock className="w-3 h-3" />
+              <span>미달성 등급은 실루엣 비공개</span>
+            </span>
+          </div>
 
           {WARMTH_TIERS.map((tier) => {
             const isCurrent = tier.level === progress.tier.level;
             const isUnlocked = progress.lifetimeWarmth >= tier.minWarmth;
+            const isNextTarget = progress.nextTier?.level === tier.level;
 
             return (
               <div
@@ -113,27 +120,51 @@ export function WarmthLevelModal({
                     ? 'bg-indigo-950/40 border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
                     : isUnlocked
                     ? 'bg-white/[0.03] border-white/[0.08]'
-                    : 'bg-white/[0.01] border-white/[0.04] opacity-60'
+                    : isNextTarget
+                    ? 'bg-slate-900/50 border-amber-500/30'
+                    : 'bg-white/[0.01] border-white/[0.04] opacity-50'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <WarmthAvatar tier={tier} size="md" showBadge={false} />
+                  {/* 아바타: 해금 시 정식 디자인, 미해금 시 미스터리 실루엣 🔒 */}
+                  <WarmthAvatar
+                    tier={tier}
+                    size="md"
+                    showBadge={false}
+                    isLocked={!isUnlocked}
+                  />
+
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-slate-100">
-                        Lv.{tier.level} {tier.title}
+                      <span className={`text-xs font-bold ${isUnlocked ? 'text-slate-100' : isNextTarget ? 'text-slate-300' : 'text-slate-500'}`}>
+                        {isUnlocked ? (
+                          `Lv.${tier.level} ${tier.title}`
+                        ) : isNextTarget ? (
+                          `Lv.${tier.level} ${tier.title} (다음 목표)`
+                        ) : (
+                          `Lv.${tier.level} ??? (비밀의 등급)`
+                        )}
                       </span>
+
                       <span className="text-[10px] text-slate-400 font-mono">
                         ({tier.minWarmth}{tier.maxWarmth !== Infinity ? `~${tier.maxWarmth}` : '+'} 온기)
                       </span>
+
                       {isCurrent && (
                         <span className="text-[9px] font-bold text-indigo-300 bg-indigo-950 px-1.5 py-0.2 rounded border border-indigo-500/40">
                           내 등급
                         </span>
                       )}
                     </div>
+
                     <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {tier.perk}
+                      {isUnlocked ? (
+                        tier.perk
+                      ) : isNextTarget ? (
+                        `🔒 ${tier.minWarmth - progress.lifetimeWarmth} 온기 추가 시 정식 아바타와 전용 오라 공개!`
+                      ) : (
+                        `🔒 ${tier.minWarmth} 온기 달성 시 실루엣 및 디자인 해금`
+                      )}
                     </p>
                   </div>
                 </div>
