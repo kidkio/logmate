@@ -42,6 +42,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 1일 1회 작성 제한 (새벽 3시 KST 기준)
+    const existing = await failureStore.getTodaysFailure(deviceId);
+    if (existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '오늘은 이미 실패를 공유하셨습니다. 매일 새벽 3시에 새로운 실패를 털어놓으실 수 있어요!',
+          code: 'LIMIT_EXCEEDED',
+          existingFailure: existing,
+        },
+        { status: 429 }
+      );
+    }
+
     // 1. AI 분석 (카테고리, 태그, 위로 한마디, 유해성 검사)
     const analysis = await analyzeFailure(content);
 

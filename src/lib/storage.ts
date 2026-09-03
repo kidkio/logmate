@@ -98,8 +98,29 @@ class FailureStore {
     return this.enrichWithUserReactions(item, deviceId);
   }
 
+  async getTodaysFailure(deviceId: string): Promise<Failure | null> {
+    await this.init();
+    const cutoff = getToday3AMKSTCutoff();
+    const my = Array.from(this.failures.values()).filter(
+      (f) => f.deviceId === deviceId && !f.isBlinded && new Date(f.createdAt) >= cutoff
+    );
+    if (my.length === 0) return null;
+    my.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return this.enrichWithUserReactions(my[0], deviceId);
+  }
+
   async create(failureData: Omit<Failure, 'id' | 'reactions' | 'reportCount' | 'isBlinded' | 'createdAt'>): Promise<Failure> {
     await this.init();
+
+    // 1일 1회 작성 제한 (새벽 3시 KST 기준)
+    const existing = await this.getTodaysFailure(failureData.deviceId);
+    if (existing) {
+      const err = new Error('오늘은 이미 실패를 공유하셨습니다. 매일 새벽 3시에 새로운 실패를 털어놓으실 수 있어요!');
+      (err as any).existingFailure = existing;
+      (err as any).code = 'LIMIT_EXCEEDED';
+      throw err;
+    }
+
     const id = 'fail-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
     const newFailure: Failure = {
       ...failureData,
