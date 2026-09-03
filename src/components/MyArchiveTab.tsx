@@ -19,6 +19,9 @@ import { FailureCard } from './FailureCard';
 import { MoonlightCalendar } from './MoonlightCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { getDeviceId } from '@/lib/device';
+import { calculateWarmthProgress, getStoredWarmth, WarmthProgress } from '@/lib/warmthSystem';
+import { WarmthAvatar } from './WarmthAvatar';
+import { WarmthLevelModal } from './WarmthLevelModal';
 
 interface MyArchiveTabProps {
   myFailures: Failure[];
@@ -38,16 +41,15 @@ export function MyArchiveTab({
   const [failuresState, setFailuresState] = useState<Failure[]>(myFailures);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [userWarmth, setUserWarmth] = useState<number>(0);
-  const [userTitle, setUserTitle] = useState<string | null>(null);
+  const [warmthProgress, setWarmthProgress] = useState<WarmthProgress>(() => {
+    const stored = getStoredWarmth();
+    return calculateWarmthProgress(stored.lifetime, stored.spendable);
+  });
+  const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('logmate_user_warmth');
-      setUserWarmth(saved ? parseInt(saved, 10) : 0);
-      const title = localStorage.getItem('logmate_user_title');
-      setUserTitle(title);
-    }
+    const stored = getStoredWarmth();
+    setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
   }, []);
 
   useEffect(() => {
@@ -85,26 +87,55 @@ export function MyArchiveTab({
       {/* 1. 프로필 & 계정 정보 카드 */}
       <div className="bg-gradient-to-br from-indigo-950/60 via-slate-900 to-purple-950/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/[0.08] shadow-xl space-y-3.5">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-indigo-500/20">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* 레벨 진화 아바타 */}
+            <WarmthAvatar
+              tier={warmthProgress.tier}
+              size="lg"
+              onClick={() => setIsLevelModalOpen(true)}
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] font-semibold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
                   {user?.provider === 'kakao' ? '🟡 카카오' : user?.provider === 'google' ? '⚪ Google' : user?.provider === 'email' ? '✉️ 이메일' : '🕶️ 게스트'}
                 </span>
+                {/* 클릭 시 레벨 도감 오픈 */}
+                <button
+                  onClick={() => setIsLevelModalOpen(true)}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-sm flex items-center gap-1 transition-all hover:scale-105 active:scale-95 ${warmthProgress.tier.badgeColor}`}
+                  title="온기 레벨 & 도감 보기"
+                >
+                  <span>{warmthProgress.tier.avatarEmoji}</span>
+                  <span>Lv.{warmthProgress.tier.level} {warmthProgress.tier.title}</span>
+                </button>
               </div>
+
               <h3 className="text-sm sm:text-base font-bold text-slate-100 mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span>{user?.nickname || '익명의 친구'}</span>
-                {userTitle && (
-                  <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-500/40 shadow-sm flex items-center gap-1">
-                    <span>👑 {userTitle}</span>
-                  </span>
-                )}
               </h3>
               {user?.email && (
                 <p className="text-[10px] text-slate-500">{user.email}</p>
+              )}
+
+              {/* 다음 레벨 미니 진행 바 */}
+              {!warmthProgress.isMaxLevel && warmthProgress.nextTier && (
+                <div
+                  onClick={() => setIsLevelModalOpen(true)}
+                  className="pt-1 space-y-0.5 cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between text-[9px] text-slate-400 group-hover:text-amber-300 transition-colors">
+                    <span>다음: {warmthProgress.nextTier.title}</span>
+                    <span className="font-mono text-amber-300 font-bold">
+                      {warmthProgress.warmthToNext}개 남음 ({warmthProgress.progressPct}%)
+                    </span>
+                  </div>
+                  <div className="w-36 sm:w-48 h-1.5 bg-slate-800/80 rounded-full overflow-hidden border border-white/[0.05]">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 rounded-full transition-all duration-300"
+                      style={{ width: `${warmthProgress.progressPct}%` }}
+                    />
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -163,11 +194,15 @@ export function MyArchiveTab({
               <span>{comfortNotes.length}</span>
             </div>
           </div>
-          <div className="bg-slate-950/60 rounded-xl p-2.5 border border-amber-500/30 text-center bg-amber-950/20">
+          <div
+            onClick={() => setIsLevelModalOpen(true)}
+            className="bg-slate-950/60 rounded-xl p-2.5 border border-amber-500/30 text-center bg-amber-950/20 cursor-pointer hover:bg-amber-900/30 transition-all active:scale-95"
+            title="온기 레벨 도감 보기"
+          >
             <span className="text-[10px] text-amber-300 font-semibold block mb-0.5">내 보유 온기</span>
             <div className="flex items-center justify-center gap-1 text-amber-300 font-black text-base">
               <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400 animate-pulse" />
-              <span>{userWarmth}개</span>
+              <span>{warmthProgress.spendableWarmth}개</span>
             </div>
           </div>
         </div>
@@ -339,6 +374,13 @@ export function MyArchiveTab({
           </div>
         </div>
       )}
+
+      {/* 4. 온기 레벨 & 프로필 도감 모달 */}
+      <WarmthLevelModal
+        isOpen={isLevelModalOpen}
+        onClose={() => setIsLevelModalOpen(false)}
+        progress={warmthProgress}
+      />
     </div>
   );
 }
