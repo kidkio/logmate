@@ -336,7 +336,7 @@ function MainApp() {
           )}
 
           {activeTab === 'archive' && (
-            <div className="w-full h-full flex-1 overflow-y-auto space-y-4 pr-1">
+            <div className="w-full h-full flex-1 overflow-y-auto space-y-4 pr-1 pb-28 no-scrollbar">
               <MyArchiveTab
                 myFailures={myFailures}
                 onReaction={handleReaction}

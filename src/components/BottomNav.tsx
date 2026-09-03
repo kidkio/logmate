@@ -32,9 +32,9 @@ export function BottomNav({ activeTab, onChangeTab, myFailuresCount }: BottomNav
   ];
 
   return (
-    <nav className="w-full px-3 pb-2.5 pt-1 z-30 flex-shrink-0">
+    <nav className="w-full px-3 pt-1 pb-[max(0.625rem,env(safe-area-inset-bottom))] z-30 flex-shrink-0">
       {/* 21st.dev 플로팅 아일랜드 독 */}
-      <div className="bg-slate-900/85 backdrop-blur-2xl border border-white/[0.1] rounded-2xl p-1 shadow-[0_10px_35px_rgba(0,0,0,0.7)] flex items-center justify-around">
+      <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/[0.1] rounded-2xl p-1 shadow-[0_10px_35px_rgba(0,0,0,0.7)] flex items-center justify-around">
         {navItems.map((item) => {
           const IconComponent = item.icon;
           const isActive = activeTab === item.id;

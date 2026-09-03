@@ -38,9 +38,9 @@ export function Header({
 
   return (
     <header className="w-full border-b border-white/[0.08] bg-slate-950/90 backdrop-blur-md sticky top-0 z-30 flex-shrink-0">
-      <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between">
+      <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
         {/* 좌측 로고 및 슬림 타이틀 */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20">
             <Moon className="w-3.5 h-3.5 fill-white/20" />
           </div>
@@ -55,7 +55,7 @@ export function Header({
         </div>
 
         {/* 우측 액션: ASMR 끄기 플로팅 알약 + 온기 배지 + 내 기록 */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           {/* ASMR 재생 중일 때: 어느 탭에서든 즉시 끌 수 있는 탑 바 버튼 */}
           {playingSound !== 'off' && (
             <button
