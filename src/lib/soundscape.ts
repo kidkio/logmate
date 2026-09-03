@@ -1,29 +1,110 @@
 // 브라우저 Web Audio API 기반의 하이엔드 절차적(Procedural) ASMR 오디오 엔진
-// 4가지 사운드(빗소리, 모닥불, 밤바다 파도, 밤바람)를 각기 고유한 물리 음향 모델링으로 합성
+// 4가지 사운드(빗소리, 모닥불, 밤바다 파도, 밤바람)의 독립 채널 믹싱 및 멀티 트랙 동시 조합 지원
 
-export type SoundMode = 'off' | 'rain' | 'fire' | 'wave' | 'wind';
+export type SoundChannel = 'rain' | 'fire' | 'wave' | 'wind';
+export type SoundMode = 'off' | SoundChannel | 'mix';
 
-type SoundListener = (mode: SoundMode) => void;
+export interface ChannelInfo {
+  id: SoundChannel;
+  name: string;
+  emoji: string;
+  description: string;
+  defaultVolume: number;
+}
+
+export const SOUND_CHANNELS: Record<SoundChannel, ChannelInfo> = {
+  rain: {
+    id: 'rain',
+    name: '창문 빗소리',
+    emoji: '🌧️',
+    description: '창문에 톡톡 부딪히는 실제 빗방울 소리',
+    defaultVolume: 0.7,
+  },
+  fire: {
+    id: 'fire',
+    name: '장작 모닥불',
+    emoji: '🔥',
+    description: '타닥타닥 나무 타는 온기 소리',
+    defaultVolume: 0.75,
+  },
+  wave: {
+    id: 'wave',
+    name: '밤바다 파도',
+    emoji: '🌊',
+    description: '밀물과 썰물의 깊고 아늑한 호흡',
+    defaultVolume: 0.65,
+  },
+  wind: {
+    id: 'wind',
+    name: '새벽 밤바람',
+    emoji: '🍃',
+    description: '나뭇잎 스치는 부드러운 바람결',
+    defaultVolume: 0.6,
+  },
+};
+
+export interface SoundPreset {
+  id: string;
+  name: string;
+  channels: SoundChannel[];
+  emoji: string;
+}
+
+export const SOUND_PRESETS: SoundPreset[] = [
+  { id: 'rain_fire', name: '비 내리는 산장', channels: ['rain', 'fire'], emoji: '🌧️🔥' },
+  { id: 'wave_wind', name: '한밤의 해변', channels: ['wave', 'wind'], emoji: '🌊🍃' },
+  { id: 'rain_wind', name: '새벽 젖은 숲길', channels: ['rain', 'wind'], emoji: '🌧️🍃' },
+];
+
+export type SoundListener = (activeChannels: SoundChannel[]) => void;
 
 class SoundscapeManager {
   private ctx: AudioContext | null = null;
-  private currentMode: SoundMode = 'off';
   private masterGain: GainNode | null = null;
-  private currentVolume: number = 0.45;
-  private activeNodes: AudioNode[] = [];
-  private activeIntervals: (NodeJS.Timeout | number)[] = [];
+  private masterVolume: number = 0.55;
+
+  private activeChannels: Set<SoundChannel> = new Set();
+  private channelVolumes: Record<SoundChannel, number> = {
+    rain: 0.7,
+    fire: 0.75,
+    wave: 0.65,
+    wind: 0.6,
+  };
+
+  private channelGains: Record<SoundChannel, GainNode | null> = {
+    rain: null,
+    fire: null,
+    wave: null,
+    wind: null,
+  };
+
+  private channelNodes: Record<SoundChannel, AudioNode[]> = {
+    rain: [],
+    fire: [],
+    wave: [],
+    wind: [],
+  };
+
+  private channelIntervals: Record<SoundChannel, (NodeJS.Timeout | number)[]> = {
+    rain: [],
+    fire: [],
+    wave: [],
+    wind: [],
+  };
+
   private listeners: Set<SoundListener> = new Set();
 
   public subscribe(listener: SoundListener): () => void {
     this.listeners.add(listener);
-    listener(this.currentMode);
+    listener(Array.from(this.activeChannels));
     return () => {
       this.listeners.delete(listener);
     };
   }
 
   private notify() {
-    this.listeners.forEach((fn) => fn(this.currentMode));
+    const list = Array.from(this.activeChannels);
+    this.listeners.forEach((fn) => fn(list));
   }
 
   private initContext() {
@@ -32,21 +113,72 @@ class SoundscapeManager {
       if (AudioContextClass) {
         this.ctx = new AudioContextClass();
         this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
+        this.masterGain.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
         this.masterGain.connect(this.ctx.destination);
       }
     }
   }
 
+  private ensureChannelGain(channel: SoundChannel): GainNode | null {
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return null;
+
+    if (!this.channelGains[channel]) {
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(this.channelVolumes[channel], this.ctx.currentTime);
+      gain.connect(this.masterGain);
+      this.channelGains[channel] = gain;
+    }
+    return this.channelGains[channel];
+  }
+
   public setVolume(val: number) {
-    this.currentVolume = Math.max(0, Math.min(1, val));
+    this.masterVolume = Math.max(0, Math.min(1, val));
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setTargetAtTime(this.currentVolume, this.ctx.currentTime, 0.05);
+      this.masterGain.gain.setTargetAtTime(this.masterVolume, this.ctx.currentTime, 0.05);
     }
   }
 
   public getVolume(): number {
-    return this.currentVolume;
+    return this.masterVolume;
+  }
+
+  public setChannelVolume(channel: SoundChannel, val: number) {
+    const vol = Math.max(0, Math.min(1, val));
+    this.channelVolumes[channel] = vol;
+    const gain = this.channelGains[channel];
+    if (gain && this.ctx) {
+      gain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  public getChannelVolume(channel: SoundChannel): number {
+    return this.channelVolumes[channel] ?? 0.7;
+  }
+
+  public isChannelActive(channel: SoundChannel): boolean {
+    return this.activeChannels.has(channel);
+  }
+
+  public getActiveChannels(): SoundChannel[] {
+    return Array.from(this.activeChannels);
+  }
+
+  public hasActiveSound(): boolean {
+    return this.activeChannels.size > 0;
+  }
+
+  public getMode(): SoundMode {
+    const list = Array.from(this.activeChannels);
+    if (list.length === 0) return 'off';
+    if (list.length === 1) return list[0];
+    return 'mix';
+  }
+
+  public getActiveSummary(): string {
+    const list = Array.from(this.activeChannels);
+    if (list.length === 0) return '';
+    return list.map((c) => SOUND_CHANNELS[c].name).join(' + ');
   }
 
   // 화이트 노이즈 버퍼
@@ -61,7 +193,7 @@ class SoundscapeManager {
     return buffer;
   }
 
-  // 핑크/브라운 노이즈 버퍼 (깊은 저음 질감)
+  // 핑크/브라운 노이즈 버퍼
   private createBrownNoiseBuffer(durationSec = 3): AudioBuffer | null {
     if (!this.ctx) return null;
     const bufferSize = this.ctx.sampleRate * durationSec;
@@ -72,35 +204,30 @@ class SoundscapeManager {
       const white = Math.random() * 2 - 1;
       data[i] = (lastOut + 0.02 * white) / 1.02;
       lastOut = data[i];
-      data[i] *= 3.5; // 게인 보정
+      data[i] *= 3.5;
     }
     return buffer;
   }
 
-  public play(mode: SoundMode) {
-    if (this.currentMode === mode) return;
-    this.stop();
-
-    if (mode === 'off') {
-      this.currentMode = 'off';
-      this.notify();
-      return;
-    }
+  // 단일 채널 시작
+  public startChannel(channel: SoundChannel) {
+    if (this.activeChannels.has(channel)) return;
 
     this.initContext();
-    if (!this.ctx || !this.masterGain) return;
-
+    if (!this.ctx) return;
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
 
-    const now = this.ctx.currentTime;
+    const channelGain = this.ensureChannelGain(channel);
+    if (!channelGain) return;
 
-    // =========================================================================
-    // 1. [RAIN: 포근한 창문 빗소리]
-    // =========================================================================
-    if (mode === 'rain') {
-      // 레이어 1: 굵은 빗줄기 배경음 (브라운 노이즈 + 로우패스 480Hz)
+    const now = this.ctx.currentTime;
+    const nodes: AudioNode[] = [];
+    const intervals: (NodeJS.Timeout | number)[] = [];
+
+    if (channel === 'rain') {
+      // 1. 굵은 빗줄기 배경음
       const brownBuf = this.createBrownNoiseBuffer(3);
       if (brownBuf) {
         const brownSrc = this.ctx.createBufferSource();
@@ -116,12 +243,12 @@ class SoundscapeManager {
 
         brownSrc.connect(lowFilter);
         lowFilter.connect(brownGain);
-        brownGain.connect(this.masterGain);
+        brownGain.connect(channelGain);
         brownSrc.start();
-        this.activeNodes.push(brownSrc, lowFilter, brownGain);
+        nodes.push(brownSrc, lowFilter, brownGain);
       }
 
-      // 레이어 2: 흩뿌려지는 잔잔한 빗방울 지지직 질감 (화이트 노이즈 + 밴드패스 2400Hz)
+      // 2. 흩뿌려지는 잔잔한 빗방울 질감
       const whiteBuf = this.createWhiteNoiseBuffer(2);
       if (whiteBuf) {
         const whiteSrc = this.ctx.createBufferSource();
@@ -138,14 +265,14 @@ class SoundscapeManager {
 
         whiteSrc.connect(drizzleFilter);
         drizzleFilter.connect(drizzleGain);
-        drizzleGain.connect(this.masterGain);
+        drizzleGain.connect(channelGain);
         whiteSrc.start();
-        this.activeNodes.push(whiteSrc, drizzleFilter, drizzleGain);
+        nodes.push(whiteSrc, drizzleFilter, drizzleGain);
       }
 
-      // 레이어 3: 창문에 톡톡 부딪히는 실제 빗방울 물방울 소리 (Random Damped Micro Sine Chirp)
+      // 3. 창문에 톡톡 부딪히는 빗방울 소리
       const dropTimer = setInterval(() => {
-        if (!this.ctx || !this.masterGain || this.currentMode !== 'rain') return;
+        if (!this.ctx || !this.activeChannels.has('rain')) return;
         try {
           const t = this.ctx.currentTime;
           const osc = this.ctx.createOscillator();
@@ -159,19 +286,15 @@ class SoundscapeManager {
           gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
 
           osc.connect(gain);
-          gain.connect(this.masterGain);
+          gain.connect(channelGain);
           osc.start(t);
           osc.stop(t + 0.04);
         } catch {}
       }, 120);
 
-      this.activeIntervals.push(dropTimer);
-    }
-
-    // =========================================================================
-    // 2. [FIRE: 타닥타닥 타오르는 장작 모닥불]
-    // =========================================================================
-    else if (mode === 'fire') {
+      intervals.push(dropTimer);
+    } else if (channel === 'fire') {
+      // 1. 모닥불 저음 불꽃 바디
       const brownBuf = this.createBrownNoiseBuffer(3);
       if (brownBuf) {
         const fireSrc = this.ctx.createBufferSource();
@@ -187,11 +310,12 @@ class SoundscapeManager {
 
         fireSrc.connect(flameFilter);
         flameFilter.connect(flameGain);
-        flameGain.connect(this.masterGain);
+        flameGain.connect(channelGain);
         fireSrc.start();
-        this.activeNodes.push(fireSrc, flameFilter, flameGain);
+        nodes.push(fireSrc, flameFilter, flameGain);
       }
 
+      // 2. 열기 스르륵 노이즈
       const whiteBuf = this.createWhiteNoiseBuffer(2);
       if (whiteBuf) {
         const hissSrc = this.ctx.createBufferSource();
@@ -208,13 +332,14 @@ class SoundscapeManager {
 
         hissSrc.connect(hissFilter);
         hissFilter.connect(hissGain);
-        hissGain.connect(this.masterGain);
+        hissGain.connect(channelGain);
         hissSrc.start();
-        this.activeNodes.push(hissSrc, hissFilter, hissGain);
+        nodes.push(hissSrc, hissFilter, hissGain);
       }
 
+      // 3. 타닥타닥 모닥불 불티 파열음
       const crackleTimer = setInterval(() => {
-        if (!this.ctx || !this.masterGain || this.currentMode !== 'fire') return;
+        if (!this.ctx || !this.activeChannels.has('fire')) return;
         if (Math.random() > 0.6) return;
 
         try {
@@ -242,20 +367,16 @@ class SoundscapeManager {
 
             popSrc.connect(popFilter);
             popFilter.connect(popGain);
-            popGain.connect(this.masterGain);
+            popGain.connect(channelGain);
 
             popSrc.start(t + burstOffset);
           }
         } catch {}
       }, 100);
 
-      this.activeIntervals.push(crackleTimer);
-    }
-
-    // =========================================================================
-    // 3. [WAVE: 심야 바닷가 밀물과 썰물 파도]
-    // =========================================================================
-    else if (mode === 'wave') {
+      intervals.push(crackleTimer);
+    } else if (channel === 'wave') {
+      // 파도 밀물/썰물
       const brownBuf = this.createBrownNoiseBuffer(4);
       if (brownBuf) {
         const waveSrc = this.ctx.createBufferSource();
@@ -287,17 +408,13 @@ class SoundscapeManager {
 
         waveSrc.connect(waveFilter);
         waveFilter.connect(waveGain);
-        waveGain.connect(this.masterGain);
+        waveGain.connect(channelGain);
         waveSrc.start();
 
-        this.activeNodes.push(waveSrc, waveFilter, waveGain, lfo, lfoGainMod, lfoFilterMod);
+        nodes.push(waveSrc, waveFilter, waveGain, lfo, lfoGainMod, lfoFilterMod);
       }
-    }
-
-    // =========================================================================
-    // 4. [WIND: 새벽 들판의 휘몰아치는 따뜻한 밤바람]
-    // =========================================================================
-    else if (mode === 'wind') {
+    } else if (channel === 'wind') {
+      // 밤바람
       const whiteBuf = this.createWhiteNoiseBuffer(3);
       if (whiteBuf) {
         const windSrc = this.ctx.createBufferSource();
@@ -334,18 +451,80 @@ class SoundscapeManager {
 
         windSrc.connect(whistleFilter);
         whistleFilter.connect(windGain);
-        windGain.connect(this.masterGain);
+        windGain.connect(channelGain);
         windSrc.start();
 
-        this.activeNodes.push(windSrc, whistleFilter, windGain, windLfo, windFilterMod, windGainLfo, windGainMod);
+        nodes.push(windSrc, whistleFilter, windGain, windLfo, windFilterMod, windGainLfo, windGainMod);
       }
     }
 
-    this.currentMode = mode;
+    this.channelNodes[channel] = nodes;
+    this.channelIntervals[channel] = intervals;
+    this.activeChannels.add(channel);
     this.notify();
   }
 
-  // 온기 촛불 탭 시 재생되는 맑은 크리스탈 싱잉볼/차임벨 음향
+  // 단일 채널 정지
+  public stopChannel(channel: SoundChannel) {
+    if (!this.activeChannels.has(channel)) return;
+
+    this.channelIntervals[channel].forEach((id) => clearInterval(id as any));
+    this.channelIntervals[channel] = [];
+
+    this.channelNodes[channel].forEach((node) => {
+      try {
+        if ('stop' in node && typeof (node as any).stop === 'function') {
+          (node as any).stop();
+        }
+        node.disconnect();
+      } catch {}
+    });
+    this.channelNodes[channel] = [];
+
+    this.activeChannels.delete(channel);
+    this.notify();
+  }
+
+  // 채널 토글 (조합 ON/OFF)
+  public toggleChannel(channel: SoundChannel) {
+    if (this.activeChannels.has(channel)) {
+      this.stopChannel(channel);
+    } else {
+      this.startChannel(channel);
+    }
+  }
+
+  // 추천 조합 프리셋 재생 (기존 소리 끄고 프리셋 채널들 켜기)
+  public playPreset(preset: SoundPreset) {
+    this.stopAll();
+    preset.channels.forEach((ch) => this.startChannel(ch));
+  }
+
+  // 기존 API 호환 메서드 (play)
+  public play(mode: SoundMode) {
+    if (mode === 'off') {
+      this.stopAll();
+      return;
+    }
+    if (mode === 'mix') return;
+
+    // 단일 모드 재생 시 다른 채널 끄고 해당 채널만 켜기
+    this.stopAll();
+    this.startChannel(mode);
+  }
+
+  public stopAll() {
+    const list = Array.from(this.activeChannels);
+    list.forEach((ch) => this.stopChannel(ch));
+    this.activeChannels.clear();
+    this.notify();
+  }
+
+  public stop() {
+    this.stopAll();
+  }
+
+  // 촛불 차임벨
   public playCandleChime() {
     this.initContext();
     if (!this.ctx || !this.masterGain) return;
@@ -373,28 +552,6 @@ class SoundscapeManager {
       osc.start(t + delay);
       osc.stop(t + delay + 1.3);
     });
-  }
-
-  public stop() {
-    this.activeIntervals.forEach((id) => clearInterval(id as any));
-    this.activeIntervals = [];
-
-    this.activeNodes.forEach((node) => {
-      try {
-        if ('stop' in node && typeof (node as any).stop === 'function') {
-          (node as any).stop();
-        }
-        node.disconnect();
-      } catch {}
-    });
-    this.activeNodes = [];
-
-    this.currentMode = 'off';
-    this.notify();
-  }
-
-  public getMode(): SoundMode {
-    return this.currentMode;
   }
 }
 

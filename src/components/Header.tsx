@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Moon, Sparkles, History, VolumeX } from 'lucide-react';
-import { soundscape, SoundMode } from '@/lib/soundscape';
+import { soundscape, SoundChannel } from '@/lib/soundscape';
 
 interface HeaderProps {
   todaysCount: number;
@@ -12,14 +12,6 @@ interface HeaderProps {
   userNickname?: string;
 }
 
-const SOUND_LABELS: Record<SoundMode, string> = {
-  off: '',
-  rain: '빗소리 🌧️',
-  fire: '모닥불 🔥',
-  wave: '파도 🌊',
-  wind: '밤바람 🍃',
-};
-
 export function Header({
   todaysCount,
   totalComforts,
@@ -27,11 +19,11 @@ export function Header({
   myFailuresCount,
   userNickname,
 }: HeaderProps) {
-  const [playingSound, setPlayingSound] = useState<SoundMode>('off');
+  const [activeChannels, setActiveChannels] = useState<SoundChannel[]>([]);
 
   useEffect(() => {
-    const unsub = soundscape.subscribe((mode) => {
-      setPlayingSound(mode);
+    const unsub = soundscape.subscribe((channels) => {
+      setActiveChannels(channels);
     });
     return unsub;
   }, []);
@@ -54,18 +46,18 @@ export function Header({
           </div>
         </div>
 
-        {/* 우측 액션: ASMR 끄기 플로팅 알약 + 온기 배지 + 내 기록 */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-          {/* ASMR 재생 중일 때: 어느 탭에서든 즉시 끌 수 있는 탑 바 버튼 */}
-          {playingSound !== 'off' && (
+        {/* 우측 유저 익명 프로필 및 내 서재 버튼 & ASMR 끄기 */}
+        <div className="flex items-center gap-2">
+          {/* 전역 ASMR 빠른 끄기 버튼 (조합된 사연 명칭 표기) */}
+          {activeChannels.length > 0 && (
             <button
-              onClick={() => soundscape.stop()}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse hover:bg-emerald-900/70 active:scale-95 transition-all"
-              title="현재 재생 중인 ASMR 끄기"
+              onClick={() => soundscape.stopAll()}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse hover:bg-emerald-900/70 active:scale-95 transition-all max-w-[170px] truncate"
+              title="현재 재생 중인 ASMR 모두 끄기"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>{SOUND_LABELS[playingSound]} 끄기</span>
-              <VolumeX className="w-3 h-3 text-emerald-300" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+              <span className="truncate">{soundscape.getActiveSummary()} 끄기</span>
+              <VolumeX className="w-3 h-3 text-emerald-300 flex-shrink-0" />
             </button>
           )}
 

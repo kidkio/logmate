@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Flame, Sparkles, Volume2, VolumeX, Moon, Heart, Send, Waves, Wind, CloudRain, Clock, ThermometerSun, ExternalLink } from 'lucide-react';
-import { soundscape, SoundMode } from '@/lib/soundscape';
+import { Flame, Sparkles, Volume2, VolumeX, Moon, Heart, Send, Waves, Wind, CloudRain, Clock, ThermometerSun, ExternalLink, Sliders } from 'lucide-react';
+import { soundscape, SOUND_CHANNELS, SOUND_PRESETS, SoundChannel, SoundPreset } from '@/lib/soundscape';
 import { User } from '@/types';
 import { RewardedAdModal } from './RewardedAdModal';
 import { Toast } from './Toast';
@@ -42,14 +42,20 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   const [isRewardedAdOpen, setIsRewardedAdOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 사운드스케이프 상태
-  const [soundMode, setSoundMode] = useState<SoundMode>(soundscape.getMode());
-  const [volume, setVolume] = useState<number>(soundscape.getVolume());
+  // 사운드스케이프 멀티 채널 믹서 상태
+  const [activeChannels, setActiveChannels] = useState<SoundChannel[]>(soundscape.getActiveChannels());
+  const [masterVolume, setMasterVolume] = useState<number>(soundscape.getVolume());
+  const [channelVolumes, setChannelVolumes] = useState<Record<SoundChannel, number>>({
+    rain: soundscape.getChannelVolume('rain'),
+    fire: soundscape.getChannelVolume('fire'),
+    wave: soundscape.getChannelVolume('wave'),
+    wind: soundscape.getChannelVolume('wind'),
+  });
   const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
 
   // 사운드스케이프 전역 상태 구독
   useEffect(() => {
-    const unsub = soundscape.subscribe((mode) => setSoundMode(mode));
+    const unsub = soundscape.subscribe((channels) => setActiveChannels(channels));
     return unsub;
   }, []);
 
@@ -79,8 +85,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   useEffect(() => {
     if (!sleepTimerMinutes) return;
     const timer = setTimeout(() => {
-      soundscape.stop();
-      setSoundMode('off');
+      soundscape.stopAll();
       setSleepTimerMinutes(null);
     }, sleepTimerMinutes * 60 * 1000);
 
@@ -148,21 +153,31 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
     }
   };
 
-  // 사운드 모드 전환
-  const handleToggleSound = (mode: SoundMode) => {
-    if (soundMode === mode) {
-      soundscape.stop();
-      setSoundMode('off');
-    } else {
-      soundscape.play(mode);
-      setSoundMode(mode);
-    }
+  // 개별 채널 토글 (멀티 트랙 조합)
+  const handleToggleChannel = (channel: SoundChannel) => {
+    soundscape.toggleChannel(channel);
   };
 
-  // 볼륨 변경
-  const handleVolumeChange = (newVol: number) => {
-    setVolume(newVol);
+  // 개별 채널 볼륨 변경
+  const handleChannelVolumeChange = (channel: SoundChannel, val: number) => {
+    soundscape.setChannelVolume(channel, val);
+    setChannelVolumes((prev) => ({ ...prev, [channel]: val }));
+  };
+
+  // 마스터 볼륨 변경
+  const handleMasterVolumeChange = (newVol: number) => {
+    setMasterVolume(newVol);
     soundscape.setVolume(newVol);
+  };
+
+  // 추천 조합 프리셋 적용
+  const handlePresetClick = (preset: SoundPreset) => {
+    soundscape.playPreset(preset);
+  };
+
+  // 모든 소리 끄기
+  const handleStopAll = () => {
+    soundscape.stopAll();
   };
 
   // 속삭임 등록
@@ -370,111 +385,166 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         </div>
       </div>
 
-      {/* 3. 4채널 고유 특성 ASMR 사운드스케이프 믹서 */}
-      <div className="glass-card rounded-2xl p-4 border border-white/[0.08] space-y-3">
+      {/* 3. 4채널 멀티 트랙 조합 ASMR 사운드스케이프 믹서 */}
+      <div className="glass-card rounded-2xl p-4 border border-white/[0.08] space-y-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Volume2 className="w-4 h-4 text-indigo-400" />
-            <span className="text-xs font-bold text-slate-200">심야 수면 ASMR (특화 4채널)</span>
+            <span className="text-xs font-bold text-slate-200">심야 수면 ASMR 믹서 (나만의 소리 조합)</span>
           </div>
 
-          {soundMode !== 'off' && (
-            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+          {activeChannels.length > 0 && (
+            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>재생 중</span>
+              <span>{activeChannels.length}개 소리 동시 조합 중</span>
             </span>
           )}
         </div>
 
-        {/* 4채널 사운드 모드 선택 버튼 (각기 뚜렷한 음향적 개성 부여) */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* 1. 빗소리 */}
-          <button
-            onClick={() => handleToggleSound('rain')}
-            className={`p-3 rounded-xl border text-left transition-all flex items-center gap-2.5 active:scale-95 ${
-              soundMode === 'rain'
-                ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]'
-                : 'bg-white/[0.03] border-white/[0.06] text-slate-300 hover:bg-white/[0.06]'
-            }`}
-          >
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
-              <CloudRain className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold block">창문 빗소리</span>
-              <span className="text-[10px] text-slate-400 block truncate">실제 빗방울 물방울 소리</span>
-            </div>
-          </button>
+        {/* 추천 조합 프리셋 바 */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+          <span className="text-[10px] text-slate-400 flex-shrink-0 font-medium flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            <span>추천 조합:</span>
+          </span>
+          {SOUND_PRESETS.map((p) => {
+            const isCurrent =
+              p.channels.length === activeChannels.length &&
+              p.channels.every((c) => activeChannels.includes(c));
 
-          {/* 2. 모닥불 */}
-          <button
-            onClick={() => handleToggleSound('fire')}
-            className={`p-3 rounded-xl border text-left transition-all flex items-center gap-2.5 active:scale-95 ${
-              soundMode === 'fire'
-                ? 'bg-amber-600/30 border-amber-400 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]'
-                : 'bg-white/[0.03] border-white/[0.06] text-slate-300 hover:bg-white/[0.06]'
-            }`}
-          >
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
-              <Flame className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold block">장작 모닥불</span>
-              <span className="text-[10px] text-slate-400 block truncate">타닥타닥 나무 타는 소리</span>
-            </div>
-          </button>
+            return (
+              <button
+                key={p.id}
+                onClick={() => handlePresetClick(p)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all flex-shrink-0 flex items-center gap-1 active:scale-95 ${
+                  isCurrent
+                    ? 'bg-indigo-600/40 text-indigo-200 border-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
+                    : 'bg-white/[0.04] text-slate-300 border-white/[0.08] hover:bg-white/[0.08]'
+                }`}
+              >
+                <span>{p.emoji}</span>
+                <span>{p.name}</span>
+              </button>
+            );
+          })}
 
-          {/* 3. 밤바다 파도 */}
-          <button
-            onClick={() => handleToggleSound('wave')}
-            className={`p-3 rounded-xl border text-left transition-all flex items-center gap-2.5 active:scale-95 ${
-              soundMode === 'wave'
-                ? 'bg-cyan-600/30 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]'
-                : 'bg-white/[0.03] border-white/[0.06] text-slate-300 hover:bg-white/[0.06]'
-            }`}
-          >
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 flex-shrink-0">
-              <Waves className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold block">밤바다 파도</span>
-              <span className="text-[10px] text-slate-400 block truncate">밀물과 썰물의 깊은 호흡</span>
-            </div>
-          </button>
-
-          {/* 4. 밤바람 */}
-          <button
-            onClick={() => handleToggleSound('wind')}
-            className={`p-3 rounded-xl border text-left transition-all flex items-center gap-2.5 active:scale-95 ${
-              soundMode === 'wind'
-                ? 'bg-emerald-600/30 border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                : 'bg-white/[0.03] border-white/[0.06] text-slate-300 hover:bg-white/[0.06]'
-            }`}
-          >
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
-              <Wind className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold block">새벽 밤바람</span>
-              <span className="text-[10px] text-slate-400 block truncate">나뭇잎 스치는 바람결</span>
-            </div>
-          </button>
+          {activeChannels.length > 0 && (
+            <button
+              onClick={handleStopAll}
+              className="px-2.5 py-1 rounded-full text-[11px] font-bold border border-rose-500/30 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 flex-shrink-0 active:scale-95 transition-all"
+            >
+              ⏹️ 모두 끄기
+            </button>
+          )}
         </div>
 
-        {/* 볼륨 슬라이더 및 타이머 (재생 중일 때 노출) */}
-        {soundMode !== 'off' && (
-          <div className="space-y-3 pt-2 border-t border-white/[0.06] animate-in fade-in">
+        {/* 4채널 독립 믹서 카드 (각 소리를 자유롭게 켜고 끄며 개별 볼륨 조절) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {(Object.keys(SOUND_CHANNELS) as SoundChannel[]).map((ch) => {
+            const info = SOUND_CHANNELS[ch];
+            const isActive = activeChannels.includes(ch);
+
+            const iconMap = {
+              rain: <CloudRain className="w-4 h-4" />,
+              fire: <Flame className="w-4 h-4" />,
+              wave: <Waves className="w-4 h-4" />,
+              wind: <Wind className="w-4 h-4" />,
+            };
+
+            const activeColors = {
+              rain: 'border-indigo-400/60 bg-indigo-950/30 shadow-[0_0_18px_rgba(99,102,241,0.25)]',
+              fire: 'border-amber-400/60 bg-amber-950/30 shadow-[0_0_18px_rgba(245,158,11,0.25)]',
+              wave: 'border-cyan-400/60 bg-cyan-950/30 shadow-[0_0_18px_rgba(6,182,212,0.25)]',
+              wind: 'border-emerald-400/60 bg-emerald-950/30 shadow-[0_0_18px_rgba(16,185,129,0.25)]',
+            };
+
+            const iconColors = {
+              rain: 'bg-indigo-500/20 text-indigo-400',
+              fire: 'bg-amber-500/20 text-amber-400',
+              wave: 'bg-cyan-500/20 text-cyan-400',
+              wind: 'bg-emerald-500/20 text-emerald-400',
+            };
+
+            return (
+              <div
+                key={ch}
+                className={`p-3 rounded-2xl border transition-all space-y-2 ${
+                  isActive
+                    ? activeColors[ch]
+                    : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                }`}
+              >
+                {/* 상단 클릭 토글 헤더 */}
+                <div
+                  onClick={() => handleToggleChannel(ch)}
+                  className="flex items-center justify-between cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${iconColors[ch]}`}>
+                      {iconMap[ch]}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold block text-slate-100">{info.name}</span>
+                      <span className="text-[10px] text-slate-400 block truncate">{info.description}</span>
+                    </div>
+                  </div>
+
+                  {/* 활성화 상태 배지 */}
+                  <div className="flex-shrink-0 pl-2">
+                    {isActive ? (
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        <span>ON</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-slate-500 bg-white/[0.03] border border-white/[0.06] px-2 py-0.5 rounded-full">
+                        OFF
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 활성화 시 개별 채널 볼륨 슬라이더 */}
+                {isActive && (
+                  <div className="pt-2 border-t border-white/[0.06] flex items-center gap-2 text-[10px] text-slate-400 animate-in fade-in">
+                    <Sliders className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                    <span className="flex-shrink-0">음량</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={channelVolumes[ch]}
+                      onChange={(e) => handleChannelVolumeChange(ch, parseFloat(e.target.value))}
+                      className="w-full accent-indigo-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                    />
+                    <span className="font-mono text-slate-300 w-7 text-right flex-shrink-0">
+                      {Math.round(channelVolumes[ch] * 100)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 마스터 볼륨 및 수면 타이머 (1개 이상 재생 중일 때 노출) */}
+        {activeChannels.length > 0 && (
+          <div className="space-y-3 pt-3 border-t border-white/[0.08] animate-in fade-in">
             <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span>볼륨 조절</span>
-              <span className="font-mono text-slate-200">{Math.round(volume * 100)}%</span>
+              <span className="flex items-center gap-1">
+                <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                <span>전체 마스터 볼륨</span>
+              </span>
+              <span className="font-mono text-slate-200 font-bold">{Math.round(masterVolume * 100)}%</span>
             </div>
             <input
               type="range"
               min="0"
               max="1"
               step="0.01"
-              value={volume}
-              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              value={masterVolume}
+              onChange={(e) => handleMasterVolumeChange(parseFloat(e.target.value))}
               className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
             />
 
