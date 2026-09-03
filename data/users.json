@@ -1,0 +1,11 @@
+[
+  {
+    "id": "usr_mtlq7dnh_924dcda3",
+    "email": "tester@example.com",
+    "passwordHash": "260b2d568812528921b2bde3e79c013792573336a16b60f854eaf518c48c12c02c33b3074c12ee73661f141905879dd3aa524a3d1711876a8ae8df6f8b946860",
+    "salt": "4a41340dfd85bfd8f58c16573cc88997",
+    "nickname": "용감한 펭귄 #77",
+    "provider": "email",
+    "createdAt": "2026-09-03T16:15:01.853Z"
+  }
+]

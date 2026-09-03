@@ -2,153 +2,135 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  loginWithSocial: (provider: 'kakao' | 'google') => Promise<void>;
-  loginWithEmail: (email: string) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signupWithEmail: (email: string, password: string, nickname?: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithSocial: (provider: 'kakao' | 'google') => Promise<{ success: boolean; error?: string }>;
   loginGuest: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateNickname: (newNickname: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ADJECTIVES = ['이불킥하는', '토닥이는', '서투른', '야근하는', '밤샘하는', '용감한', '작심삼일', '따뜻한', '덤벙대는', '길잃은'];
-const NOUNS = ['펭귄', '쿼카', '다람쥐', '고양이', '햄스터', '수달', '곰돌이', '판다', '참새', '토끼'];
-
-function generateAnonymousNickname(): string {
-  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  const num = Math.floor(Math.random() * 900) + 100;
-  return `${adj} ${noun} #${num}`;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // 1. 앱 기동 시 실제 서버 세션 쿠키 검증 (/api/auth/me)
   useEffect(() => {
-    // 1. 로컬 스토리지에서 기존 세션 복원
-    const saved = localStorage.getItem('logmate_user');
-    if (saved) {
+    async function checkAuth() {
       try {
-        setUser(JSON.parse(saved));
-      } catch (e) {
-        localStorage.removeItem('logmate_user');
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data.success && data.user) {
+          setUser(data.user);
+          localStorage.setItem('logmate_user', JSON.stringify(data.user));
+        } else {
+          // 쿠키가 없으면 로컬 스토리지 확인
+          const local = localStorage.getItem('logmate_user');
+          if (local) {
+            try {
+              setUser(JSON.parse(local));
+            } catch {
+              localStorage.removeItem('logmate_user');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check auth:', err);
+      } finally {
+        setIsLoading(false);
       }
     }
 
-    // 2. Supabase Auth 리스너 (설정된 경우)
-    if (supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          const newUser: User = {
-            id: session.user.id,
-            email: session.user.email,
-            nickname: generateAnonymousNickname(),
-            provider: (session.user.app_metadata.provider as any) || 'email',
-            createdAt: session.user.created_at,
-          };
-          setUser(newUser);
-          localStorage.setItem('logmate_user', JSON.stringify(newUser));
-        }
-      });
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          const newUser: User = {
-            id: session.user.id,
-            email: session.user.email,
-            nickname: generateAnonymousNickname(),
-            provider: (session.user.app_metadata.provider as any) || 'email',
-            createdAt: session.user.created_at,
-          };
-          setUser(newUser);
-          localStorage.setItem('logmate_user', JSON.stringify(newUser));
-        } else if (!saved) {
-          setUser(null);
-        }
-      });
-
-      setIsLoading(false);
-      return () => subscription.unsubscribe();
-    }
-
-    setIsLoading(false);
+    checkAuth();
   }, []);
 
+  // 2. 실제 이메일 로그인
+  const loginWithEmail = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setIsLoading(false);
+        return { success: false, error: data.error || '로그인에 실패했습니다.' };
+      }
+
+      setUser(data.user);
+      localStorage.setItem('logmate_user', JSON.stringify(data.user));
+      setIsLoading(false);
+      return { success: true };
+    } catch (e: any) {
+      setIsLoading(false);
+      return { success: false, error: '서버 통신 오류가 발생했습니다.' };
+    }
+  };
+
+  // 3. 실제 이메일 회원가입
+  const signupWithEmail = async (email: string, password: string, nickname?: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, nickname }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setIsLoading(false);
+        return { success: false, error: data.error || '회원가입에 실패했습니다.' };
+      }
+
+      setUser(data.user);
+      localStorage.setItem('logmate_user', JSON.stringify(data.user));
+      setIsLoading(false);
+      return { success: true };
+    } catch (e: any) {
+      setIsLoading(false);
+      return { success: false, error: '서버 통신 오류가 발생했습니다.' };
+    }
+  };
+
+  // 4. 소셜 로그인 (카카오 / 구글)
   const loginWithSocial = async (provider: 'kakao' | 'google') => {
     setIsLoading(true);
-    if (supabase) {
-      try {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: provider === 'kakao' ? ('kakao' as any) : 'google',
-          options: {
-            redirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
-        return;
-      } catch (err) {
-        console.warn('Supabase OAuth failed, proceeding with local simulated login:', err);
+    try {
+      const res = await fetch('/api/auth/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setIsLoading(false);
+        return { success: false, error: data.error || '소셜 인증에 실패했습니다.' };
       }
-    }
 
-    // 로컬 시뮬레이션 로그인 (API 키 미설정 환경에서도 1초 만에 테스트 가능)
-    const mockUser: User = {
-      id: `usr_${provider}_` + Date.now().toString(36),
-      email: `${provider}_user@example.com`,
-      nickname: generateAnonymousNickname(),
-      provider,
-      createdAt: new Date().toISOString(),
-    };
-    setUser(mockUser);
-    localStorage.setItem('logmate_user', JSON.stringify(mockUser));
-    setIsLoading(false);
+      setUser(data.user);
+      localStorage.setItem('logmate_user', JSON.stringify(data.user));
+      setIsLoading(false);
+      return { success: true };
+    } catch (e: any) {
+      setIsLoading(false);
+      return { success: false, error: '서버 통신 오류가 발생했습니다.' };
+    }
   };
 
-  const loginWithEmail = async (email: string) => {
-    setIsLoading(true);
-    if (supabase) {
-      try {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (!error) {
-          alert('로그인 확인 이메일이 발송되었습니다! 메일함을 확인해주세요.');
-          setIsLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('Supabase OTP failed, fallback to local login:', err);
-      }
-    }
-
-    const mockUser: User = {
-      id: `usr_email_` + Date.now().toString(36),
-      email,
-      nickname: generateAnonymousNickname(),
-      provider: 'email',
-      createdAt: new Date().toISOString(),
-    };
-    setUser(mockUser);
-    localStorage.setItem('logmate_user', JSON.stringify(mockUser));
-    setIsLoading(false);
-  };
-
+  // 5. 게스트 모드
   const loginGuest = async () => {
     setIsLoading(true);
     const guestUser: User = {
       id: `usr_guest_` + Date.now().toString(36),
-      nickname: generateAnonymousNickname(),
+      nickname: '게스트 쿼카 #' + Math.floor(Math.random() * 900 + 100),
       provider: 'guest',
       createdAt: new Date().toISOString(),
     };
@@ -157,9 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   };
 
-  const logout = () => {
-    if (supabase) {
-      supabase.auth.signOut().catch(console.error);
+  // 6. 로그아웃
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error(err);
     }
     localStorage.removeItem('logmate_user');
     setUser(null);
@@ -177,8 +162,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isLoading,
-        loginWithSocial,
         loginWithEmail,
+        signupWithEmail,
+        loginWithSocial,
         loginGuest,
         logout,
         updateNickname,
