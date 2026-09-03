@@ -97,8 +97,11 @@ function MainApp() {
   const fetchMyTodayStatus = useCallback(async () => {
     if (!deviceId) return;
     try {
-      const targetId = user?.id || deviceId;
-      const res = await fetch(`/api/failures/my-today?deviceId=${encodeURIComponent(targetId)}`);
+      const params = new URLSearchParams();
+      if (deviceId) params.set('deviceId', deviceId);
+      if (user?.id) params.set('userId', user.id);
+
+      const res = await fetch(`/api/failures/my-today?${params.toString()}`);
       const data = await res.json();
       if (data.success && data.hasPostedToday) {
         setMyTodayFailure(data.failure);
@@ -122,8 +125,10 @@ function MainApp() {
       const params = new URLSearchParams({
         category: activeCategory,
         sort: activeSort,
-        deviceId: user?.id || deviceId,
+        deviceId: deviceId,
       });
+      if (user?.id) params.set('userId', user.id);
+
       const res = await fetch(`/api/failures?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
@@ -140,8 +145,11 @@ function MainApp() {
   const fetchMyFailures = useCallback(async () => {
     if (!deviceId) return;
     try {
-      const targetId = user?.id || deviceId;
-      const res = await fetch(`/api/failures/my?deviceId=${encodeURIComponent(targetId)}`);
+      const params = new URLSearchParams();
+      if (deviceId) params.set('deviceId', deviceId);
+      if (user?.id) params.set('userId', user.id);
+
+      const res = await fetch(`/api/failures/my?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         setMyFailures(data.failures);

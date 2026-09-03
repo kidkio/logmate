@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Failure } from '@/types';
-import { Sparkles, Star, Moon, Calendar as CalendarIcon } from 'lucide-react';
+import { Moon, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
 
 interface MoonlightCalendarProps {
   failures: Failure[];
@@ -12,11 +12,12 @@ interface MoonlightCalendarProps {
 export function MoonlightCalendar({ failures, onSelectFailure }: MoonlightCalendarProps) {
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed
+  const month = now.getMonth();
 
   // 해당 월의 첫 날과 마지막 날 계산
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
+
   const totalDays = lastDay.getDate();
   const startDayOfWeek = firstDay.getDay(); // 0(일) ~ 6(토)
 
@@ -28,9 +29,6 @@ export function MoonlightCalendar({ failures, onSelectFailure }: MoonlightCalend
       dateFailureMap.set(d.getDate(), f);
     }
   });
-
-  const overcomeCount = failures.filter((f) => f.isOvercome).length;
-  const growthRate = failures.length > 0 ? Math.round((overcomeCount / failures.length) * 100) : 0;
 
   const daysArray = Array.from({ length: totalDays }, (_, i) => i + 1);
   const blanks = Array.from({ length: startDayOfWeek }, (_, i) => i);
@@ -49,20 +47,15 @@ export function MoonlightCalendar({ failures, onSelectFailure }: MoonlightCalend
               <Sparkles className="w-3 h-3 text-amber-400" />
             </h3>
             <p className="text-[10px] text-slate-400">
-              실패를 마주하고 극복해가는 나의 성장 궤적
+              털어놓은 밤마다 별빛이 켜지는 나만의 달빛 여정
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 text-[10px] font-bold">
-          <span className="text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2 py-0.5 rounded-full">
+          <span className="text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2.5 py-0.5 rounded-full">
             🌙 기록 {dateFailureMap.size}일
           </span>
-          {overcomeCount > 0 && (
-            <span className="text-amber-300 bg-amber-950/60 border border-amber-800/40 px-2 py-0.5 rounded-full">
-              ⭐ 극복 {growthRate}%
-            </span>
-          )}
         </div>
       </div>
 
@@ -92,9 +85,7 @@ export function MoonlightCalendar({ failures, onSelectFailure }: MoonlightCalend
               onClick={() => failure && onSelectFailure && onSelectFailure(failure)}
               disabled={!failure}
               className={`h-8 sm:h-9 rounded-xl flex flex-col items-center justify-center transition-all relative ${
-                failure?.isOvercome
-                  ? 'bg-amber-500/20 border border-amber-400/60 text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.3)] hover:scale-105'
-                  : failure
+                failure
                   ? 'bg-indigo-600/30 border border-indigo-400/50 text-indigo-200 shadow-[0_0_10px_rgba(99,102,241,0.25)] hover:scale-105'
                   : isToday
                   ? 'bg-white/[0.06] border border-white/[0.15] text-slate-200'
@@ -102,9 +93,7 @@ export function MoonlightCalendar({ failures, onSelectFailure }: MoonlightCalend
               }`}
             >
               <span className="text-[10px] font-mono leading-none">{day}</span>
-              {failure?.isOvercome ? (
-                <Star className="w-2.5 h-2.5 text-amber-300 fill-amber-300 mt-0.5" />
-              ) : failure ? (
+              {failure ? (
                 <Moon className="w-2.5 h-2.5 text-indigo-300 fill-indigo-300 mt-0.5" />
               ) : null}
             </button>
@@ -114,13 +103,9 @@ export function MoonlightCalendar({ failures, onSelectFailure }: MoonlightCalend
 
       {/* 범례 안내 */}
       <div className="flex items-center justify-center gap-3 pt-1 text-[10px] text-slate-500 border-t border-white/[0.05]">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 text-indigo-300">
           <Moon className="w-3 h-3 text-indigo-400 fill-indigo-400" />
-          <span>기록한 날</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-          <span>극복 완료 🌟</span>
+          <span>실패를 털어놓은 밤</span>
         </div>
       </div>
     </div>

@@ -128,12 +128,16 @@ class FailureStore {
     return this.enrichWithUserReactions(item, deviceId);
   }
 
-  async getTodaysFailure(deviceId: string): Promise<Failure | null> {
+  async getTodaysFailure(deviceId: string, userId?: string): Promise<Failure | null> {
     await this.init();
     const cutoff = getToday3AMKSTCutoff();
-    const my = Array.from(this.failures.values()).filter(
-      (f) => f.deviceId === deviceId && !f.isBlinded && new Date(f.createdAt) >= cutoff
-    );
+    const my = Array.from(this.failures.values()).filter((f) => {
+      if (f.isBlinded) return false;
+      if (new Date(f.createdAt) < cutoff) return false;
+      if (userId && f.userId && f.userId === userId) return true;
+      if (deviceId && f.deviceId === deviceId) return true;
+      return false;
+    });
     if (my.length === 0) return null;
     my.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return this.enrichWithUserReactions(my[0], deviceId);
@@ -142,8 +146,8 @@ class FailureStore {
   async create(failureData: Omit<Failure, 'id' | 'reactions' | 'reportCount' | 'isBlinded' | 'createdAt'>): Promise<Failure> {
     await this.init();
 
-    // 1일 1회 작성 제한 (새벽 3시 KST 기준)
-    const existing = await this.getTodaysFailure(failureData.deviceId);
+    // 1일 1회 작성 제한 (새벽 3시 KST 기준 - deviceId 및 userId 복합 확인)
+    const existing = await this.getTodaysFailure(failureData.deviceId, failureData.userId);
     if (existing) {
       const err = new Error('오늘은 이미 실패를 공유하셨습니다. 매일 새벽 3시에 새로운 실패를 털어놓으실 수 있어요!');
       (err as any).existingFailure = existing;
@@ -292,9 +296,13 @@ class FailureStore {
     return { isBlinded: failure.isBlinded, reportCount: failure.reportCount };
   }
 
-  async getMyFailures(deviceId: string): Promise<Failure[]> {
+  async getMyFailures(deviceId: string, userId?: string): Promise<Failure[]> {
     await this.init();
-    const my = Array.from(this.failures.values()).filter((f) => f.deviceId === deviceId);
+    const my = Array.from(this.failures.values()).filter((f) => {
+      if (userId && f.userId === userId) return true;
+      if (deviceId && f.deviceId === deviceId) return true;
+      return false;
+    });
     my.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return my.map((f) => this.enrichWithUserReactions(f, deviceId));
   }

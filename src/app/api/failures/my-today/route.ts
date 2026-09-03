@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { failureStore } from '@/lib/storage';
+import { getUserBySession } from '@/lib/user-store';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const deviceId = searchParams.get('deviceId');
+    const deviceId = searchParams.get('deviceId') || '';
+    let userId = searchParams.get('userId') || undefined;
 
-    if (!deviceId) {
-      return NextResponse.json({ success: false, error: 'deviceId is required' }, { status: 400 });
+    // 세션 쿠키에서도 userId 확인
+    const token = req.cookies.get('logmate_token')?.value;
+    if (token && !userId) {
+      const user = await getUserBySession(token);
+      if (user) userId = user.id;
     }
 
-    const todayFailure = await failureStore.getTodaysFailure(deviceId);
+    if (!deviceId && !userId) {
+      return NextResponse.json({ success: false, error: 'deviceId or userId is required' }, { status: 400 });
+    }
+
+    const todayFailure = await failureStore.getTodaysFailure(deviceId, userId);
 
     if (!todayFailure) {
       return NextResponse.json({

@@ -11,7 +11,6 @@ import {
   Sparkles, 
   LogOut, 
   Mail, 
-  Star,
   CheckCircle2,
   Quote
 } from 'lucide-react';
@@ -54,24 +53,6 @@ export function MyArchiveTab({
     }
   }, [user]);
 
-  // 극복 완료 토글 핸들러
-  const handleToggleOvercome = async (failureId: string) => {
-    // 낙관적 UI 업데이트
-    setFailuresState((prev) =>
-      prev.map((f) => (f.id === failureId ? { ...f, isOvercome: !f.isOvercome } : f))
-    );
-
-    try {
-      await fetch('/api/failures/overcome', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ failureId }),
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const totalComfortsReceived = failuresState.reduce((acc, curr) => {
     return (
       acc +
@@ -82,7 +63,6 @@ export function MyArchiveTab({
     );
   }, 0);
 
-  const overcomeCount = failuresState.filter((f) => f.isOvercome).length;
   const streakDays = failuresState.length > 0 ? Math.min(failuresState.length, 7) : 0;
 
   return (
@@ -137,8 +117,8 @@ export function MyArchiveTab({
 
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-slate-950/60 rounded-xl p-2.5 border border-white/[0.06] text-center">
-            <span className="text-[10px] text-slate-400 block mb-0.5">털어놓은 실패</span>
-            <span className="text-base font-black text-slate-100">{failuresState.length}개</span>
+            <span className="text-[10px] text-slate-400 block mb-0.5">털어놓은 밤</span>
+            <span className="text-base font-black text-slate-100">{failuresState.length}편</span>
           </div>
           <div className="bg-slate-950/60 rounded-xl p-2.5 border border-white/[0.06] text-center">
             <span className="text-[10px] text-slate-400 block mb-0.5">받은 토닥임</span>
@@ -148,10 +128,10 @@ export function MyArchiveTab({
             </div>
           </div>
           <div className="bg-slate-950/60 rounded-xl p-2.5 border border-white/[0.06] text-center">
-            <span className="text-[10px] text-slate-400 block mb-0.5">극복한 실패</span>
+            <span className="text-[10px] text-slate-400 block mb-0.5">온기 쪽지함</span>
             <div className="flex items-center justify-center gap-1 text-amber-300 font-black text-base">
-              <Star className="w-3.5 h-3.5 fill-amber-300" />
-              <span>{overcomeCount}</span>
+              <Mail className="w-3.5 h-3.5 text-amber-400" />
+              <span>{comfortNotes.length}</span>
             </div>
           </div>
         </div>
@@ -249,33 +229,21 @@ export function MyArchiveTab({
                 id={`my-failure-${failure.id}`}
                 className="space-y-1.5 relative transition-all"
               >
-                {/* 상단 극복 토글 스탬프 버튼 */}
+                {/* 상단 날짜 및 카테고리 태그 */}
                 <div className="flex items-center justify-between px-1">
                   <span className="text-[10px] text-slate-500 font-mono">
                     {new Date(failure.createdAt).toLocaleDateString('ko-KR', {
+                      year: 'numeric',
                       month: 'long',
                       day: 'numeric',
                     })}
                   </span>
-
-                  <button
-                    onClick={() => handleToggleOvercome(failure.id)}
-                    className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-all border ${
-                      failure.isOvercome
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
-                        : 'bg-white/[0.03] text-slate-400 border-white/[0.08] hover:text-amber-300 hover:border-amber-400/30'
-                    }`}
-                  >
-                    <Star
-                      className={`w-3 h-3 ${
-                        failure.isOvercome ? 'fill-amber-400 text-amber-400' : ''
-                      }`}
-                    />
-                    <span>{failure.isOvercome ? '극복 완료 🌟' : '극복했나요?'}</span>
-                  </button>
+                  <span className="text-[10px] font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+                    #{failure.category}
+                  </span>
                 </div>
 
-                <div className={failure.isOvercome ? 'ring-1 ring-amber-400/40 rounded-2xl' : ''}>
+                <div>
                   <FailureCard
                     failure={failure}
                     onReaction={onReaction}
