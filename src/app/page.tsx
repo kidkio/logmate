@@ -13,6 +13,7 @@ import { InstallGuideModal } from '@/components/InstallGuideModal';
 import { LandingAuth } from '@/components/LandingAuth';
 import { DailyRitualGate } from '@/components/DailyRitualGate';
 import { FailureShortsFeed } from '@/components/FailureShortsFeed';
+import { PassPurchaseModal } from '@/components/PassPurchaseModal';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Moon } from 'lucide-react';
 
@@ -30,8 +31,9 @@ function MainApp() {
   const [myTodayFailure, setMyTodayFailure] = useState<Failure | null>(null);
   const [todaySimilarCount, setTodaySimilarCount] = useState<number>(0);
 
-  // 3개 무료 열람 + 숏츠 광고 잠금 해제 상태
-  const [unlockedCount, setUnlockedCount] = useState<number>(3);
+  // 무제한 이용권 보유 여부
+  const [hasPass, setHasPass] = useState(false);
+  const [isPassModalOpen, setIsPassModalOpen] = useState(false);
 
   // 모달 상태
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -45,7 +47,7 @@ function MainApp() {
     totalComforts: 0,
   });
 
-  // 초기화 (기기 식별자 및 온보딩 체크)
+  // 초기화 (기기 식별자, 온보딩, 패스 체크)
   useEffect(() => {
     const id = getDeviceId();
     setDeviceId(id);
@@ -54,11 +56,21 @@ function MainApp() {
     if (!hasSeenOnboarding && user) {
       setIsOnboardingOpen(true);
     }
+
+    const savedPass = localStorage.getItem('logmate_has_pass');
+    if (savedPass === 'true') {
+      setHasPass(true);
+    }
   }, [user]);
 
   const handleCompleteOnboarding = () => {
     localStorage.setItem('logmate_onboarded', 'true');
     setIsOnboardingOpen(false);
+  };
+
+  const handlePassPurchaseSuccess = () => {
+    setHasPass(true);
+    localStorage.setItem('logmate_has_pass', 'true');
   };
 
   // 통계 불러오기
@@ -142,11 +154,10 @@ function MainApp() {
     }
   }, [deviceId, user, fetchFailures, fetchMyFailures, fetchStats, fetchMyTodayStatus]);
 
-  // 글 작성 성공 핸들러 -> 작성 즉시 숏츠 뷰로 자동 전환!
+  // 글 작성 성공 핸들러 -> 작성 즉시 숏츠 뷰로 자동 전환
   const handleSuccessCreate = (result: CreateFailureResponse) => {
     setMyTodayFailure(result.failure);
     setTodaySimilarCount(result.similarCount);
-    // 상위 3개 유사 실패를 우선 배치
     const otherFailures = failures.filter(
       (f) => f.id !== result.failure.id && !result.similarFailures.some((sf) => sf.id === f.id)
     );
@@ -154,16 +165,6 @@ function MainApp() {
     setMyFailures((prev) => [result.failure, ...prev]);
     fetchStats();
     setActiveTab('today');
-  };
-
-  // 숏츠에서 광고 시청 후 3개 추가 잠금 해제
-  const handleUnlockMore = (count: number) => {
-    setUnlockedCount((prev) => prev + count);
-  };
-
-  // 이용권으로 전체 잠금 해제
-  const handleUnlockAll = () => {
-    setUnlockedCount(9999);
   };
 
   // 리액션 핸들러
@@ -276,14 +277,14 @@ function MainApp() {
         <div className="flex-1 px-4 py-3">
           {activeTab === 'today' && (
             <div>
-              {/* 핵심 비즈니스 로직: 오늘 아직 실패를 작성하지 않았으면 -> 작성 게이트 먼저 표시! */}
+              {/* 오늘 아직 실패를 작성하지 않았으면 -> 작성 게이트 먼저 표시 */}
               {!myTodayFailure ? (
                 <DailyRitualGate
                   onSuccess={handleSuccessCreate}
                   onExploreAnyway={() => setActiveTab('explore')}
                 />
               ) : (
-                /* 오늘 작성 완료 시 -> 유튜브 숏츠 스타일의 실패 숏폼 피드 바로 재생! */
+                /* 오늘 작성 완료 시 -> 인스타 터치 & 자동 광고 삽입 숏폼 피드 바로 재생 */
                 <div className="space-y-3 animate-in fade-in duration-300">
                   <FailureShortsFeed
                     failures={failures}
@@ -291,9 +292,8 @@ function MainApp() {
                     similarCount={todaySimilarCount}
                     onReaction={handleReaction}
                     onReport={(id) => setReportingFailureId(id)}
-                    unlockedCount={unlockedCount}
-                    onUnlockMore={handleUnlockMore}
-                    onUnlockAll={handleUnlockAll}
+                    hasPass={hasPass}
+                    onOpenPassModal={() => setIsPassModalOpen(true)}
                   />
                 </div>
               )}
@@ -319,7 +319,7 @@ function MainApp() {
                 onReport={(id) => setReportingFailureId(id)}
                 isLoading={isLoading}
                 unlockedCount={9999}
-                onOpenAdModal={() => setUnlockedCount(9999)}
+                onOpenAdModal={() => setIsPassModalOpen(true)}
               />
             </div>
           )}
@@ -339,6 +339,13 @@ function MainApp() {
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           myFailuresCount={myFailures.length}
+        />
+
+        {/* 이용권 구매 팝업 모달 */}
+        <PassPurchaseModal
+          isOpen={isPassModalOpen}
+          onClose={() => setIsPassModalOpen(false)}
+          onPurchaseSuccess={handlePassPurchaseSuccess}
         />
 
         {/* 온보딩 모달 */}
