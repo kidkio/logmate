@@ -1,0 +1,16 @@
+{
+  "name": "LogMate (로그메이트)",
+  "short_name": "LogMate",
+  "description": "오늘 당신의 실패를 공유하세요. 실패를 털어놓을 가장 다정한 친구, LogMate",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
