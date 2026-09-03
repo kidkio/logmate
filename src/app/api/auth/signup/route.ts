@@ -35,9 +35,11 @@ export async function POST(req: NextRequest) {
       createdAt: user.createdAt,
     };
 
-    const isSecure = req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https';
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
+    const isHttps = req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https';
+    const isSecure = isHttps && !host.includes('158.101.157.207') && !host.includes('localhost');
 
-    const response = NextResponse.json({ success: true, user: safeUser });
+    const response = NextResponse.json({ success: true, user: safeUser, token });
     response.cookies.set('logmate_token', token, {
       httpOnly: true,
       secure: isSecure,

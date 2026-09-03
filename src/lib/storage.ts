@@ -30,6 +30,27 @@ export function getToday3AMKSTCutoff(): Date {
   return new Date(kstCutoffUtcTime);
 }
 
+// 사연 소유권 판별 (게스트와 정식 회원 계정 간의 사연 유출 철저 차단)
+function isFailureOwnedBy(f: Failure, deviceId?: string, userId?: string): boolean {
+  // 1. 등록된 정식 회원(이메일, 카카오, 구글)이 작성한 글인 경우
+  if (f.userId && !f.userId.startsWith('usr_guest_')) {
+    // 오직 해당 회원 본인 계정으로 로그인했을 때만 본인 글로 판정 (게스트나 타 회원에게 절대 노출 금지)
+    return Boolean(userId && f.userId === userId);
+  }
+
+  // 2. 특정 게스트 세션이 작성한 글인 경우
+  if (f.userId && f.userId.startsWith('usr_guest_')) {
+    return Boolean(userId && f.userId === userId);
+  }
+
+  // 3. 비로그인 익명 기기로 작성된 글인 경우 (deviceId 대조)
+  if (!f.userId) {
+    return Boolean(deviceId && f.deviceId === deviceId);
+  }
+
+  return false;
+}
+
 // In-Memory 캐시 및 영구 JSON 파일 저장소
 class FailureStore {
   private failures: Map<string, Failure> = new Map();
@@ -134,9 +155,7 @@ class FailureStore {
     const my = Array.from(this.failures.values()).filter((f) => {
       if (f.isBlinded) return false;
       if (new Date(f.createdAt) < cutoff) return false;
-      if (userId && f.userId && f.userId === userId) return true;
-      if (deviceId && f.deviceId === deviceId) return true;
-      return false;
+      return isFailureOwnedBy(f, deviceId, userId);
     });
     if (my.length === 0) return null;
     my.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -299,9 +318,7 @@ class FailureStore {
   async getMyFailures(deviceId: string, userId?: string): Promise<Failure[]> {
     await this.init();
     const my = Array.from(this.failures.values()).filter((f) => {
-      if (userId && f.userId === userId) return true;
-      if (deviceId && f.deviceId === deviceId) return true;
-      return false;
+      return isFailureOwnedBy(f, deviceId, userId);
     });
     my.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return my.map((f) => this.enrichWithUserReactions(f, deviceId));

@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signupWithEmail: (email: string, password: string, nickname?: string) => Promise<{ success: boolean; error?: string }>;
+  signupWithEmail: (email: string, password: string, nickname?: string) => Promise<{ success: boolean; error?: string; user?: User }>;
   loginWithSocial: (provider: 'kakao' | 'google') => Promise<{ success: boolean; error?: string }>;
   loginGuest: () => Promise<void>;
   logout: () => Promise<void>;
@@ -24,20 +24,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const res = await fetch('/api/auth/me');
+        // 소셜 로그인 리다이렉트 후 전달된 토큰 파라미터 확인
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const authToken = urlParams.get('auth_token');
+          if (authToken) {
+            localStorage.setItem('logmate_token', authToken);
+            // URL 파라미터 정리
+            urlParams.delete('auth_token');
+            urlParams.delete('auth_provider');
+            const cleanUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '');
+            window.history.replaceState({}, document.title, cleanUrl);
+          }
+        }
+
+        const token = typeof window !== 'undefined' ? localStorage.getItem('logmate_token') : null;
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch('/api/auth/me', { headers });
         const data = await res.json();
         if (data.success && data.user) {
           setUser(data.user);
           localStorage.setItem('logmate_user', JSON.stringify(data.user));
         } else {
-          // 쿠키가 없으면 로컬 스토리지 확인
+          // 서버 인증 실패 시, 게스트 세션인 경우만 유지하고 그 외는 정리
           const local = localStorage.getItem('logmate_user');
           if (local) {
             try {
-              setUser(JSON.parse(local));
+              const parsed = JSON.parse(local);
+              if (parsed.provider === 'guest') {
+                setUser(parsed);
+              } else {
+                localStorage.removeItem('logmate_user');
+                localStorage.removeItem('logmate_token');
+                setUser(null);
+              }
             } catch {
               localStorage.removeItem('logmate_user');
+              localStorage.removeItem('logmate_token');
+              setUser(null);
             }
+          } else {
+            setUser(null);
           }
         }
       } catch (err) {
@@ -65,6 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: data.error || '로그인에 실패했습니다.' };
       }
 
+      if (data.token) {
+        localStorage.setItem('logmate_token', data.token);
+      }
       setUser(data.user);
       localStorage.setItem('logmate_user', JSON.stringify(data.user));
       setIsLoading(false);
@@ -90,10 +124,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: data.error || '회원가입에 실패했습니다.' };
       }
 
+      if (data.token) {
+        localStorage.setItem('logmate_token', data.token);
+      }
+      localStorage.setItem('logmate_just_signed_up', 'true');
       setUser(data.user);
       localStorage.setItem('logmate_user', JSON.stringify(data.user));
       setIsLoading(false);
-      return { success: true };
+      return { success: true, user: data.user };
     } catch (e: any) {
       setIsLoading(false);
       return { success: false, error: '서버 통신 오류가 발생했습니다.' };
@@ -128,8 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 5. 게스트 모드
   const loginGuest = async () => {
     setIsLoading(true);
+    localStorage.removeItem('logmate_token');
     const guestUser: User = {
-      id: `usr_guest_` + Date.now().toString(36),
+      id: `usr_guest_` + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
       nickname: '게스트 쿼카 #' + Math.floor(Math.random() * 900 + 100),
       provider: 'guest',
       createdAt: new Date().toISOString(),
@@ -147,6 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error(err);
     }
     localStorage.removeItem('logmate_user');
+    localStorage.removeItem('logmate_token');
     setUser(null);
   };
 

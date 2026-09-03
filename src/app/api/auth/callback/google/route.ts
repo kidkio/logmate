@@ -60,9 +60,13 @@ export async function GET(req: NextRequest) {
 
     // 4. 세션 생성 및 쿠키 발급
     const token = await createSession(user.id);
-    const isSecure = protocol === 'https:';
+    const isSecure = protocol === 'https:' && !host.includes('158.101.157.207') && !host.includes('localhost');
 
-    const response = NextResponse.redirect(homeUrl);
+    const redirectUrl = new URL(homeUrl);
+    redirectUrl.searchParams.set('auth_token', token);
+    redirectUrl.searchParams.set('auth_provider', 'google');
+
+    const response = NextResponse.redirect(redirectUrl);
     response.cookies.set('logmate_token', token, {
       httpOnly: true,
       secure: isSecure,

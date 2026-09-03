@@ -16,7 +16,7 @@ import { FailureShortsFeed } from '@/components/FailureShortsFeed';
 import { PassPurchaseModal } from '@/components/PassPurchaseModal';
 import { MidnightLoungeTab } from '@/components/MidnightLoungeTab';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { Moon } from 'lucide-react';
+import { Moon, Sparkles } from 'lucide-react';
 
 function MainApp() {
   const { user, isLoading: authLoading } = useAuth();
@@ -64,7 +64,15 @@ function MainApp() {
     if (savedPass === 'true') {
       setHasPass(true);
     }
+
+    const justSignedUp = localStorage.getItem('logmate_just_signed_up');
+    if (justSignedUp === 'true' && user) {
+      setWelcomeModalOpen(true);
+      localStorage.removeItem('logmate_just_signed_up');
+    }
   }, [user]);
+
+  const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
 
   const handleCompleteOnboarding = () => {
     localStorage.setItem('logmate_onboarded', 'true');
@@ -371,6 +379,46 @@ function MainApp() {
           onClose={() => setReportingFailureId(null)}
           onSubmitReport={handleReportSubmit}
         />
+
+        {/* 회원가입 완료 축하 & 익명 닉네임 안내 확인 모달 */}
+        {welcomeModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+            <div className="glass-card max-w-sm w-full p-6 rounded-3xl border border-indigo-500/40 text-center space-y-4 shadow-[0_0_60px_rgba(99,102,241,0.35)]">
+              <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 animate-bounce">
+                <Sparkles className="w-8 h-8 fill-white/20" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-black text-slate-100">
+                  환영합니다! 회원가입 완료 🎉
+                </h3>
+                <p className="text-xs text-slate-400">
+                  당신만을 위한 100% 익명 닉네임이 배정되었습니다.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-indigo-950/60 rounded-2xl border border-indigo-500/40 space-y-1">
+                <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider block">
+                  나의 익명 아이덴티티
+                </span>
+                <span className="text-base font-black text-amber-300 font-mono">
+                  {user.nickname}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                입력하신 이메일은 안전하게 보관되며, 서비스 내에서는 오직 위 익명 닉네임으로만 표시됩니다.
+              </p>
+
+              <button
+                onClick={() => setWelcomeModalOpen(false)}
+                className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-indigo-500 to-pink-500 hover:from-indigo-600 hover:to-pink-600 active:scale-98 shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>🌙 오늘 밤 실패 털어놓으러 가기</span>
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
