@@ -17,9 +17,19 @@ export interface ReactionCounts {
   cheer: number;   // 내일은 성공 🍀
 }
 
+export interface User {
+  id: string;
+  email?: string;
+  nickname: string;
+  provider: 'kakao' | 'google' | 'email' | 'guest';
+  createdAt: string;
+}
+
 export interface Failure {
   id: string;
   deviceId: string;
+  userId?: string;
+  authorNickname?: string;
   content: string;
   category: CategoryType;
   tags: string[];
@@ -37,6 +47,8 @@ export interface Failure {
 export interface CreateFailureRequest {
   content: string;
   deviceId: string;
+  userId?: string;
+  authorNickname?: string;
 }
 
 export interface CreateFailureResponse {

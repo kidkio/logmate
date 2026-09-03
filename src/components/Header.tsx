@@ -8,6 +8,7 @@ interface HeaderProps {
   totalComforts: number;
   onOpenMyFailures: () => void;
   myFailuresCount: number;
+  userNickname?: string;
 }
 
 export function Header({
@@ -15,6 +16,7 @@ export function Header({
   totalComforts,
   onOpenMyFailures,
   myFailuresCount,
+  userNickname,
 }: HeaderProps) {
   return (
     <header className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
@@ -34,7 +36,7 @@ export function Header({
                   · 로그메이트
                 </span>
               </div>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight flex items-center gap-1.5">
+              <h1 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight flex items-center gap-1.5">
                 오늘 당신의 실패를 공유하세요
               </h1>
             </div>
@@ -42,13 +44,13 @@ export function Header({
 
           <button
             onClick={onOpenMyFailures}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all max-w-[140px] truncate"
             title="내가 쓴 실패 모아보기"
           >
-            <History className="w-3.5 h-3.5 text-indigo-400" />
-            <span>내 기록</span>
+            <History className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+            <span className="truncate">{userNickname || '내 기록'}</span>
             {myFailuresCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-indigo-500 text-[10px] text-white flex items-center justify-center font-bold">
+              <span className="w-4 h-4 rounded-full bg-indigo-500 text-[10px] text-white flex items-center justify-center font-bold flex-shrink-0">
                 {myFailuresCount}
               </span>
             )}

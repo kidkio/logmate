@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Send, ShieldCheck, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { CreateFailureResponse } from '@/types';
 import { getDeviceId } from '@/lib/device';
+import { useAuth } from '@/context/AuthContext';
 
 interface FailureFormProps {
   onSuccess: (result: CreateFailureResponse) => void;
@@ -19,6 +20,7 @@ const INSPIRATION_CHIPS = [
 ];
 
 export function FailureForm({ onSuccess }: FailureFormProps) {
+  const { user } = useAuth();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -42,7 +44,12 @@ export function FailureForm({ onSuccess }: FailureFormProps) {
       const res = await fetch('/api/failures', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: trimmed, deviceId }),
+        body: JSON.stringify({
+          content: trimmed,
+          deviceId,
+          userId: user?.id,
+          authorNickname: user?.nickname,
+        }),
       });
 
       const data = await res.json();
@@ -69,7 +76,9 @@ export function FailureForm({ onSuccess }: FailureFormProps) {
           <Sparkles className="w-4 h-4 text-indigo-400" />
           <span>오늘 있었던 당신의 실패를 털어놓으세요</span>
         </h2>
-        <span className="text-xs text-slate-500">100% 완전 익명</span>
+        <span className="text-[11px] text-indigo-400 font-medium bg-indigo-950/60 border border-indigo-800/40 px-2 py-0.5 rounded-full">
+          {user?.nickname || '100% 익명'}
+        </span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -117,7 +126,7 @@ export function FailureForm({ onSuccess }: FailureFormProps) {
         <div className="bg-slate-950/40 rounded-lg p-2.5 border border-slate-800/80 flex items-start gap-2 text-[11px] text-slate-400">
           <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
           <span>
-            회원가입 없이 즉시 기록됩니다. 타인 비방이나 실명 노출은 삼가주세요. 유사한 실패를 겪은 인원 수와 따뜻한 피드백이 실시간으로 제공됩니다.
+            {user?.nickname} 님으로 안전하게 익명 기록됩니다. 타인 비방이나 실명 노출은 삼가주세요. 유사한 실패를 겪은 인원 수와 따뜻한 피드백이 실시간으로 제공됩니다.
           </span>
         </div>
 

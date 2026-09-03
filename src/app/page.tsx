@@ -14,8 +14,12 @@ import { BottomNav, TabType } from '@/components/BottomNav';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { MyArchiveTab } from '@/components/MyArchiveTab';
 import { InstallGuideModal } from '@/components/InstallGuideModal';
+import { LandingAuth } from '@/components/LandingAuth';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { Moon, RefreshCw } from 'lucide-react';
 
-export default function HomePage() {
+function MainApp() {
+  const { user, isLoading: authLoading } = useAuth();
   const [deviceId, setDeviceId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabType>('today');
   const [failures, setFailures] = useState<Failure[]>([]);
@@ -50,12 +54,11 @@ export default function HomePage() {
     const id = getDeviceId();
     setDeviceId(id);
 
-    // 첫 방문자 온보딩 확인
     const hasSeenOnboarding = localStorage.getItem('logmate_onboarded');
-    if (!hasSeenOnboarding) {
+    if (!hasSeenOnboarding && user) {
       setIsOnboardingOpen(true);
     }
-  }, []);
+  }, [user]);
 
   const handleCompleteOnboarding = () => {
     localStorage.setItem('logmate_onboarded', 'true');
@@ -79,11 +82,12 @@ export default function HomePage() {
     }
   }, []);
 
-  // 오늘 작성 여부 확인
+  // 오늘 작성 여부 확인 (userId 및 deviceId)
   const fetchMyTodayStatus = useCallback(async () => {
     if (!deviceId) return;
     try {
-      const res = await fetch(`/api/failures/my-today?deviceId=${deviceId}`);
+      const targetId = user?.id || deviceId;
+      const res = await fetch(`/api/failures/my-today?deviceId=${encodeURIComponent(targetId)}`);
       const data = await res.json();
       if (data.success && data.hasPostedToday) {
         setMyTodayFailure(data.failure);
@@ -94,7 +98,7 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
     }
-  }, [deviceId]);
+  }, [deviceId, user]);
 
   // 전체 피드 불러오기
   const fetchFailures = useCallback(async () => {
@@ -104,7 +108,7 @@ export default function HomePage() {
       const params = new URLSearchParams({
         category: activeCategory,
         sort: activeSort,
-        deviceId,
+        deviceId: user?.id || deviceId,
       });
       const res = await fetch(`/api/failures?${params.toString()}`);
       const data = await res.json();
@@ -116,13 +120,14 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [deviceId, activeCategory, activeSort]);
+  }, [deviceId, user, activeCategory, activeSort]);
 
   // 내 실패 목록 불러오기
   const fetchMyFailures = useCallback(async () => {
     if (!deviceId) return;
     try {
-      const res = await fetch(`/api/failures/my?deviceId=${deviceId}`);
+      const targetId = user?.id || deviceId;
+      const res = await fetch(`/api/failures/my?deviceId=${encodeURIComponent(targetId)}`);
       const data = await res.json();
       if (data.success) {
         setMyFailures(data.failures);
@@ -130,16 +135,16 @@ export default function HomePage() {
     } catch (err) {
       console.error(err);
     }
-  }, [deviceId]);
+  }, [deviceId, user]);
 
   useEffect(() => {
-    if (deviceId) {
+    if (deviceId && user) {
       fetchFailures();
       fetchMyFailures();
       fetchStats();
       fetchMyTodayStatus();
     }
-  }, [deviceId, fetchFailures, fetchMyFailures, fetchStats, fetchMyTodayStatus]);
+  }, [deviceId, user, fetchFailures, fetchMyFailures, fetchStats, fetchMyTodayStatus]);
 
   // 글 작성 성공 핸들러
   const handleSuccessCreate = (result: CreateFailureResponse) => {
@@ -162,7 +167,8 @@ export default function HomePage() {
 
   // 리액션 핸들러
   const handleReaction = async (failureId: string, type: ReactionType) => {
-    if (!deviceId) return;
+    const actorId = user?.id || deviceId;
+    if (!actorId) return;
 
     const updateList = (list: Failure[]) =>
       list.map((f) => {
@@ -204,7 +210,7 @@ export default function HomePage() {
       const res = await fetch('/api/reactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ failureId, deviceId, reactionType: type }),
+        body: JSON.stringify({ failureId, deviceId: actorId, reactionType: type }),
       });
       const data = await res.json();
       if (data.success) {
@@ -224,12 +230,13 @@ export default function HomePage() {
 
   // 신고 제출 핸들러
   const handleReportSubmit = async (failureId: string, reason: string) => {
-    if (!deviceId) return;
+    const actorId = user?.id || deviceId;
+    if (!actorId) return;
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ failureId, deviceId, reason }),
+        body: JSON.stringify({ failureId, deviceId: actorId, reason }),
       });
       const data = await res.json();
       if (data.success && data.isBlinded) {
@@ -244,6 +251,23 @@ export default function HomePage() {
     }
   };
 
+  // 로그인 상태 로딩 중 화면
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-400">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white animate-pulse shadow-lg shadow-indigo-500/25">
+          <Moon className="w-6 h-6" />
+        </div>
+        <p className="text-xs font-medium">LogMate 로딩 중...</p>
+      </div>
+    );
+  }
+
+  // 비로그인 사용자 -> 랜딩 & 소셜/이메일 로그인 게이트웨이 노출
+  if (!user) {
+    return <LandingAuth />;
+  }
+
   return (
     <div className="min-h-screen bg-black flex justify-center selection:bg-indigo-500 selection:text-white">
       {/* 모바일 웹앱 컨테이너 (App Shell) */}
@@ -254,6 +278,7 @@ export default function HomePage() {
           totalComforts={stats.totalComforts}
           onOpenMyFailures={() => setActiveTab('archive')}
           myFailuresCount={myFailures.length}
+          userNickname={user.nickname}
         />
 
         {/* 탭별 뷰 렌더링 */}
@@ -324,7 +349,7 @@ export default function HomePage() {
                 onReaction={handleReaction}
                 onReport={(id) => setReportingFailureId(id)}
                 isLoading={isLoading}
-                unlockedCount={9999} /* 둘러보기 탭에서는 전체 탐색 지원 */
+                unlockedCount={9999}
                 onOpenAdModal={() => setIsAdModalOpen(true)}
               />
             </div>
@@ -383,5 +408,13 @@ export default function HomePage() {
         />
       </main>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }
