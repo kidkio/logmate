@@ -21,7 +21,11 @@ interface MidnightLoungeTabProps {
 interface FloatingSpark {
   id: number;
   text: string;
-  x: number;
+  vx: number;
+  vy: number;
+  rotate: number;
+  scale: number;
+  delay: number;
 }
 
 export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
@@ -93,16 +97,34 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
     setRippleActive(true);
     setTimeout(() => setRippleActive(false), 1200);
 
-    // 4. 떠오르는 온기 파티클 생성
-    const newSpark: FloatingSpark = {
-      id: Date.now() + Math.random(),
-      text: '+1 온기 🕯️',
-      x: (Math.random() - 0.5) * 60, // 좌우 살짝 흩날림
-    };
-    setFloatingSparks((prev) => [...prev, newSpark]);
+    // 4. 분수처럼 솟구쳐 퍼지는 온기 파티클 생성
+    const burstId = Date.now();
+    const sparksConfig = [
+      { text: '+1 온기 🕯️', vx: 0, vy: -125, scale: 1.15, rotate: 0 },
+      { text: '✨', vx: -42, vy: -140, scale: 1.1, rotate: -15 },
+      { text: '💛', vx: 42, vy: -135, scale: 1.1, rotate: 15 },
+      { text: '🕯️', vx: -72, vy: -95, scale: 0.95, rotate: -25 },
+      { text: '🔥', vx: 72, vy: -100, scale: 0.95, rotate: 25 },
+      { text: '✨', vx: -22, vy: -155, scale: 1.2, rotate: -8 },
+      { text: '🌟', vx: 22, vy: -150, scale: 1.2, rotate: 8 },
+      { text: '+1', vx: -52, vy: -110, scale: 0.9, rotate: -18 },
+      { text: '+1', vx: 52, vy: -115, scale: 0.9, rotate: 18 },
+    ];
+
+    const newSparks: FloatingSpark[] = sparksConfig.map((item, idx) => ({
+      id: burstId + idx,
+      text: item.text,
+      vx: item.vx + (Math.random() - 0.5) * 14,
+      vy: item.vy + (Math.random() - 0.5) * 18,
+      scale: item.scale,
+      rotate: item.rotate + (Math.random() - 0.5) * 12,
+      delay: idx * 25,
+    }));
+
+    setFloatingSparks((prev) => [...prev, ...newSparks]);
     setTimeout(() => {
-      setFloatingSparks((prev) => prev.filter((s) => s.id !== newSpark.id));
-    }, 1400);
+      setFloatingSparks((prev) => prev.filter((s) => !newSparks.some((ns) => ns.id === s.id)));
+    }, 1500);
 
     setCandleCount((prev) => prev + 1);
 
@@ -190,8 +212,19 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
     }
   };
 
-  // 온기 지수 계산 (온도)
-  const warmthDegree = (82 + (candleCount % 35) * 0.45).toFixed(1);
+  // 논리적 밤하늘 온기 지수:
+  // 사람의 표준 체온(36.5°C)을 가장 이상적이고 따뜻한 포근함의 기준으로 삼고,
+  // 쌀쌀한 새벽 공기(24.5°C)에서 오늘 켜진 온기 촛불과 실시간 이웃들의 접속에 비례하여
+  // 사람의 체온처럼 포근한 온기(36.5°C ~ 38.0°C)로 따뜻하게 데워집니다.
+  const baseTemp = 24.5;
+  const candleBoost = Math.min(11.5, Math.sqrt(candleCount) * 0.32);
+  const visitorBoost = Math.min(2.5, activeCount * 0.25);
+  const warmthDegree = (baseTemp + candleBoost + visitorBoost).toFixed(1);
+
+  const warmthStatus =
+    Number(warmthDegree) >= 37.5 ? '훈훈한 온기 ♨️' :
+    Number(warmthDegree) >= 36.0 ? '사람의 포근한 체온 💛' :
+    Number(warmthDegree) >= 32.0 ? '은은한 온기 🕯️' : '선선한 밤하늘 🌙';
 
   return (
     <div className="w-full h-full flex-1 overflow-y-auto space-y-4 px-1 pb-28 pt-1 text-slate-100 select-none no-scrollbar">
@@ -223,16 +256,19 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           </div>
         )}
 
-        {/* 떠오르는 온기 스파크 파티클들 */}
+        {/* 분수처럼 솟구쳐 퍼지는 온기 스파크 파티클들 */}
         {floatingSparks.map((spark) => (
           <div
             key={spark.id}
-            className="absolute top-1/2 left-1/2 pointer-events-none z-30 font-bold text-xs text-amber-300 drop-shadow-[0_0_8px_rgba(245,158,11,0.9)] animate-in fade-in"
+            className="absolute top-1/2 left-1/2 pointer-events-none z-30 font-bold text-xs text-amber-300 drop-shadow-[0_0_12px_rgba(245,158,11,0.95)] select-none"
             style={{
-              transform: `translate(calc(-50% + ${spark.x}px), -80px)`,
-              transition: 'all 1.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              animation: 'floatUp 1.3s forwards',
-            }}
+              animation: `fountainBurst 1.3s cubic-bezier(0.12, 0.8, 0.32, 1) forwards`,
+              animationDelay: `${spark.delay}ms`,
+              '--target-vx': `${spark.vx}px`,
+              '--target-vy': `${spark.vy}px`,
+              '--target-rot': `${spark.rotate}deg`,
+              '--target-scale': spark.scale,
+            } as React.CSSProperties}
           >
             {spark.text}
           </div>
@@ -312,7 +348,10 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
             <ThermometerSun className="w-3.5 h-3.5 text-amber-400" />
             <span>밤하늘 온기 지수</span>
           </div>
-          <span className="font-mono font-bold text-amber-300">{warmthDegree}°C (포근함)</span>
+          <div className="flex items-center gap-1.5 font-bold">
+            <span className="font-mono text-amber-300 text-xs">{warmthDegree}°C</span>
+            <span className="text-amber-400/90 text-[10px]">({warmthStatus})</span>
+          </div>
         </div>
       </div>
 

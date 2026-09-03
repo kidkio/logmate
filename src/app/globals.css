@@ -71,3 +71,24 @@ body {
   );
   animation: shimmer-sweep 3.5s infinite ease-in-out;
 }
+
+@keyframes fountainBurst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.35) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(calc(-50% + var(--target-vx) * 0.6), calc(-50% + var(--target-vy))) scale(var(--target-scale)) rotate(var(--target-rot));
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--target-vx)), calc(-50% + var(--target-vy) + 40px)) scale(calc(var(--target-scale) * 0.7)) rotate(calc(var(--target-rot) * 1.6));
+    opacity: 0;
+  }
+}

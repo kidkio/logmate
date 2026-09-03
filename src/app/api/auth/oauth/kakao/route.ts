@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || req.nextUrl.host;
   const redirectUri = `${protocol}//${host}/api/auth/callback/kakao`;
 
-  const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+  const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&prompt=login`;
 
   return NextResponse.redirect(kakaoAuthUrl);
 }
