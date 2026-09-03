@@ -26,6 +26,22 @@ export function LandingAuth() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const authErr = params.get('auth_error');
+      if (authErr) {
+        if (authErr === 'kakao_canceled' || authErr === 'google_canceled') {
+          setErrorMsg('소셜 로그인이 취소되었습니다.');
+        } else if (authErr.includes('token_failed')) {
+          setErrorMsg('소셜 인증 토큰 발급에 실패했습니다.');
+        } else {
+          setErrorMsg('소셜 로그인 처리 중 오류가 발생했습니다.');
+        }
+      }
+    }
+  }, []);
+
   const handleRollNickname = () => {
     setNickname(getRandomNickname());
   };
@@ -106,7 +122,10 @@ export function LandingAuth() {
         {/* 간편 소셜 로그인 버튼들 */}
         <div className="space-y-2 pt-4 relative z-10">
           <button
-            onClick={() => loginWithSocial('kakao')}
+            type="button"
+            onClick={() => {
+              window.location.href = '/api/auth/oauth/kakao';
+            }}
             disabled={isLoading || isSubmitting}
             className="w-full py-3 px-4 rounded-2xl font-bold text-xs bg-[#FEE500] hover:bg-[#FADA0A] text-[#191919] flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(254,229,0,0.15)] transition-all active:scale-[0.98] disabled:opacity-50"
           >
@@ -117,7 +136,10 @@ export function LandingAuth() {
           </button>
 
           <button
-            onClick={() => loginWithSocial('google')}
+            type="button"
+            onClick={() => {
+              window.location.href = '/api/auth/oauth/google';
+            }}
             disabled={isLoading || isSubmitting}
             className="w-full py-3 px-4 rounded-2xl font-bold text-xs bg-white/[0.05] hover:bg-white/[0.08] text-slate-100 border border-white/[0.1] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
           >

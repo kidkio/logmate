@@ -18,6 +18,10 @@ services:
       - LOCAL_LLM_MODEL=qwen2.5:1.5b
       # 백업용 구글 Gemini API 키 (선택 사항)
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      # 소셜 로그인 OAuth 키
+      - KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
     deploy:
       resources:
         limits:
