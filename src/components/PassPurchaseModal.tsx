@@ -63,7 +63,7 @@ export function PassPurchaseModal({
           </div>
           <div className="flex items-center gap-2 text-slate-200">
             <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-            <span>비슷한 실패 숏츠 무제한 자유 스와이프</span>
+            <span>이웃들의 실패 사연 피드 무제한 자유 감상</span>
           </div>
           <div className="flex items-center gap-2 text-slate-200">
             <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />

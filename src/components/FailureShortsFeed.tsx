@@ -214,7 +214,7 @@ export function FailureShortsFeed({
             </span>
           ) : (
             <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-black/70 backdrop-blur-md border border-indigo-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
-              <span>모두의 실패 숏츠</span>
+              <span>모두의 사연 피드</span>
             </span>
           )}
 

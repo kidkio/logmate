@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon, Video } from 'lucide-react';
+import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon, BookOpen } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { CreateFailureResponse } from '@/types';
 import { getDeviceId } from '@/lib/device';
@@ -90,7 +90,7 @@ export function DailyRitualGate({ onSuccess, onBrowseShorts }: DailyRitualGatePr
           </h1>
 
           <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
-            솔직하게 털어놓으면 <strong className="text-indigo-300">나와 똑같은 실패를 겪은 친구들의 숏폼 피드</strong>가 바로 열립니다.
+            솔직하게 털어놓으면 <strong className="text-indigo-300">나와 닮은 고민을 겪은 이웃들의 사연 피드</strong>가 바로 열립니다.
           </p>
         </div>
       </div>
@@ -168,7 +168,7 @@ export function DailyRitualGate({ onSuccess, onBrowseShorts }: DailyRitualGatePr
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />
-                <span>오늘의 실패 털어놓고 숏폼 피드 열기</span>
+                <span>오늘의 실패 털어놓고 사연 피드 열기</span>
               </>
             )}
           </button>
@@ -179,8 +179,8 @@ export function DailyRitualGate({ onSuccess, onBrowseShorts }: DailyRitualGatePr
               onClick={onBrowseShorts}
               className="w-full py-2.5 rounded-xl font-bold text-xs text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.08] active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all"
             >
-              <Video className="w-3.5 h-3.5 text-indigo-400" />
-              <span>🎬 다른 사람들의 사연 숏츠 먼저 구경하기</span>
+              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+              <span>📖 이웃들의 사연 피드 먼저 둘러보기</span>
             </button>
           )}
         </form>
