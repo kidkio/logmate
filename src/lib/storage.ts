@@ -369,21 +369,34 @@ class FailureStore {
   }
 
   // 회원 탈퇴 시 모든 작성 사연 및 온기 쪽지 영구 파기
-  async deleteUserData(userId: string, deviceId?: string): Promise<void> {
+  async deleteUserData(userId?: string, deviceId?: string): Promise<void> {
     await this.init();
     const toDelete: string[] = [];
     for (const [id, f] of this.failures.entries()) {
-      if (f.userId === userId || (deviceId && f.deviceId === deviceId && !f.userId)) {
+      const matchUser = Boolean(userId && f.userId === userId);
+      const matchDevice = Boolean(deviceId && f.deviceId === deviceId);
+      if (matchUser || matchDevice) {
         toDelete.push(id);
       }
     }
     toDelete.forEach((id) => this.failures.delete(id));
     await this.persistFailures();
 
+    // 관련 온기 쪽지 영구 파기
     this.comfortNotes = this.comfortNotes.filter(
-      (n) => n.targetUserId !== userId
+      (n) => (userId ? n.targetUserId !== userId : true)
     );
     await this.persistNotes();
+
+    // Supabase 연동 환경인 경우 DB 레코드도 함께 삭제
+    if (supabase) {
+      try {
+        if (userId) await supabase.from('failures').delete().eq('user_id', userId);
+        if (deviceId) await supabase.from('failures').delete().eq('device_id', deviceId);
+      } catch (e) {
+        console.warn('Supabase delete failed:', e);
+      }
+    }
   }
 
   private enrichWithUserReactions(failure: Failure, deviceId?: string): Failure {

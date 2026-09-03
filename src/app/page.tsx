@@ -37,6 +37,7 @@ function MainApp() {
   const [hasPass, setHasPass] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
   const [isBrowsingShorts, setIsBrowsingShorts] = useState(false);
+  const [isTodayStatusChecked, setIsTodayStatusChecked] = useState(false);
 
   // 모달 상태
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -122,6 +123,8 @@ function MainApp() {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsTodayStatusChecked(true);
     }
   }, [deviceId, user]);
 
@@ -306,7 +309,12 @@ function MainApp() {
         <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col px-3 sm:px-4 py-2">
           {activeTab === 'today' && (
             <div className="w-full h-full flex-1 min-h-0 flex flex-col">
-              {!myTodayFailure && !isBrowsingShorts ? (
+              {!isTodayStatusChecked ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2.5 text-slate-400 animate-pulse">
+                  <div className="w-7 h-7 rounded-full border-2 border-indigo-500/30 border-t-indigo-400 animate-spin" />
+                  <span className="text-xs font-medium text-slate-400">오늘의 안식처 상태 확인 중...</span>
+                </div>
+              ) : !myTodayFailure && !isBrowsingShorts ? (
                 /* 아직 작성하지 않았고 숏츠 둘러보기를 누르지 않았으면: 털어놓기 게이트 표시 */
                 <DailyRitualGate
                   onSuccess={handleSuccessCreate}

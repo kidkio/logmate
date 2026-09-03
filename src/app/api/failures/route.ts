@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { failureStore } from '@/lib/storage';
+import { getUserBySession } from '@/lib/user-store';
 import { getEmbedding, analyzeFailure } from '@/lib/gemini';
 import { CategoryType } from '@/types';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -31,7 +32,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { content, deviceId } = body;
+    const { content, deviceId, category: customCategory } = body;
+    let userId = body.userId;
+    const authorNickname = body.authorNickname;
+
+    // 세션 쿠키에서도 userId 확인
+    const token = req.cookies.get('logmate_token')?.value || req.headers.get('authorization')?.replace('Bearer ', '');
+    if (token && !userId) {
+      const user = await getUserBySession(token);
+      if (user) userId = user.id;
+    }
 
     if (!content || typeof content !== 'string' || content.trim().length < 5) {
       return NextResponse.json(
@@ -52,17 +62,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1일 1회 작성 제한 (새벽 3시 KST 기준)
-    const existing = await failureStore.getTodaysFailure(deviceId);
+    // 1일 1회 작성 제한 (새벽 3시 KST 기준 - deviceId 및 userId 복합 확인)
+    const existing = await failureStore.getTodaysFailure(deviceId, userId);
     if (existing) {
+      // 이미 오늘 작성한 사연이 있다면, 에러를 내지 않고 해당 사연 피드로 자동 연결
+      const similarData = await failureStore.findSimilar(existing);
       return NextResponse.json(
         {
-          success: false,
-          error: '오늘은 이미 실패를 공유하셨습니다. 매일 새벽 3시에 새로운 실패를 털어놓으실 수 있어요!',
-          code: 'LIMIT_EXCEEDED',
-          existingFailure: existing,
+          success: true,
+          alreadyPosted: true,
+          error: '오늘은 이미 실패를 공유하셨습니다. 피드로 이동합니다.',
+          failure: existing,
+          similarCount: similarData.similarCount,
+          similarFailures: similarData.similarFailures,
+          categoryCount: similarData.categoryCount,
+          aiMessage: existing.aiComfortQuote,
         },
-        { status: 429 }
+        { status: 200 }
       );
     }
 
@@ -80,11 +96,13 @@ export async function POST(req: NextRequest) {
     // 2. 임베딩 벡터 생성
     const embedding = await getEmbedding(content);
 
-    // 3. 저장소에 등록
+    // 3. 저장소에 등록 (userId 및 authorNickname 연동 필수 저장)
     const newFailure = await failureStore.create({
       deviceId,
+      userId: userId || undefined,
+      authorNickname: authorNickname || undefined,
       content: content.trim(),
-      category: analysis.category,
+      category: customCategory && customCategory !== '전체' ? customCategory : analysis.category,
       tags: analysis.tags,
       aiComfortQuote: analysis.aiComfortQuote,
       embedding,

@@ -18,6 +18,7 @@ import {
 import { FailureCard } from './FailureCard';
 import { MoonlightCalendar } from './MoonlightCalendar';
 import { useAuth } from '@/context/AuthContext';
+import { getDeviceId } from '@/lib/device';
 
 interface MyArchiveTabProps {
   myFailures: Failure[];
@@ -298,9 +299,13 @@ export function MyArchiveTab({
                 type="button"
                 onClick={async () => {
                   setIsWithdrawing(true);
-                  await withdrawAccount();
+                  const devId = getDeviceId();
+                  await withdrawAccount(devId);
                   setIsWithdrawing(false);
                   setIsWithdrawModalOpen(false);
+                  if (typeof window !== 'undefined') {
+                    window.location.href = '/';
+                  }
                 }}
                 disabled={isWithdrawing}
                 className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 active:scale-95 transition-all flex items-center justify-center gap-1 shadow-lg shadow-rose-600/30"

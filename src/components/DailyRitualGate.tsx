@@ -54,6 +54,13 @@ export function DailyRitualGate({ onSuccess, onBrowseShorts }: DailyRitualGatePr
 
       const data = await res.json();
 
+      // 만약 이미 오늘 작성한 글이거나 새로 작성된 글 객체가 있다면 바로 피드로 이동!
+      if (data.failure) {
+        setContent('');
+        onSuccess(data);
+        return;
+      }
+
       if (!res.ok || !data.success) {
         setErrorMessage(data.error || '실패 등록 중 오류가 발생했습니다.');
         return;
