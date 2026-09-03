@@ -38,6 +38,17 @@ export function MyArchiveTab({
   const [failuresState, setFailuresState] = useState<Failure[]>(myFailures);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [userWarmth, setUserWarmth] = useState<number>(0);
+  const [userTitle, setUserTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('logmate_user_warmth');
+      setUserWarmth(saved ? parseInt(saved, 10) : 0);
+      const title = localStorage.getItem('logmate_user_title');
+      setUserTitle(title);
+    }
+  }, []);
 
   useEffect(() => {
     setFailuresState(myFailures);
@@ -84,8 +95,13 @@ export function MyArchiveTab({
                   {user?.provider === 'kakao' ? '🟡 카카오' : user?.provider === 'google' ? '⚪ Google' : user?.provider === 'email' ? '✉️ 이메일' : '🕶️ 게스트'}
                 </span>
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-slate-100 mt-0.5 flex items-center gap-1.5">
+              <h3 className="text-sm sm:text-base font-bold text-slate-100 mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span>{user?.nickname || '익명의 친구'}</span>
+                {userTitle && (
+                  <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-500/40 shadow-sm flex items-center gap-1">
+                    <span>👑 {userTitle}</span>
+                  </span>
+                )}
               </h3>
               {user?.email && (
                 <p className="text-[10px] text-slate-500">{user.email}</p>
@@ -128,7 +144,7 @@ export function MyArchiveTab({
           <span className="text-xs font-black text-amber-400 font-mono">Day {Math.max(1, streakDays)}</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="bg-slate-950/60 rounded-xl p-2.5 border border-white/[0.06] text-center">
             <span className="text-[10px] text-slate-400 block mb-0.5">털어놓은 밤</span>
             <span className="text-base font-black text-slate-100">{failuresState.length}편</span>
@@ -145,6 +161,13 @@ export function MyArchiveTab({
             <div className="flex items-center justify-center gap-1 text-amber-300 font-black text-base">
               <Mail className="w-3.5 h-3.5 text-amber-400" />
               <span>{comfortNotes.length}</span>
+            </div>
+          </div>
+          <div className="bg-slate-950/60 rounded-xl p-2.5 border border-amber-500/30 text-center bg-amber-950/20">
+            <span className="text-[10px] text-amber-300 font-semibold block mb-0.5">내 보유 온기</span>
+            <div className="flex items-center justify-center gap-1 text-amber-300 font-black text-base">
+              <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400 animate-pulse" />
+              <span>{userWarmth}개</span>
             </div>
           </div>
         </div>

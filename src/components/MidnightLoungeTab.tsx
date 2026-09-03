@@ -6,6 +6,7 @@ import { soundscape, SOUND_CHANNELS, SOUND_PRESETS, SoundChannel, SoundPreset } 
 import { User } from '@/types';
 import { RewardedAdModal } from './RewardedAdModal';
 import { Toast } from './Toast';
+import { WarmthShopModal } from './WarmthShopModal';
 
 interface WhisperItem {
   id: string;
@@ -40,7 +41,17 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   const [likedWhispers, setLikedWhispers] = useState<Set<string>>(new Set());
   const [floatingSparks, setFloatingSparks] = useState<FloatingSpark[]>([]);
   const [isRewardedAdOpen, setIsRewardedAdOpen] = useState(false);
+  const [isWarmthShopOpen, setIsWarmthShopOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 내 개인 누적 보유 온기 잔액
+  const [userWarmth, setUserWarmth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('logmate_user_warmth');
+      return saved ? parseInt(saved, 10) : 0;
+    }
+    return 0;
+  });
 
   // 사운드스케이프 멀티 채널 믹서 상태
   const [activeChannels, setActiveChannels] = useState<SoundChannel[]>(soundscape.getActiveChannels());
@@ -136,6 +147,11 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
     }, 1500);
 
     setCandleCount((prev) => prev + 1);
+    setUserWarmth((prev) => {
+      const next = prev + 1;
+      if (typeof window !== 'undefined') localStorage.setItem('logmate_user_warmth', next.toString());
+      return next;
+    });
 
     try {
       const res = await fetch('/api/lounge', {
@@ -372,8 +388,27 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           </button>
         </div>
 
+        {/* 내 온기 잔액 & 온기 보상 상점 진입 버튼 */}
+        <div className="w-full max-w-xs mt-3 pt-3 border-t border-white/[0.08] flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-400">내 모은 온기:</span>
+            <span className="text-xs font-bold text-amber-300 font-mono flex items-center gap-1">
+              <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              {userWarmth}개
+            </span>
+          </div>
+
+          <button
+            onClick={() => setIsWarmthShopOpen(true)}
+            className="py-1 px-3 rounded-xl text-[11px] font-bold text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
+          >
+            <Sparkles className="w-3 h-3 text-amber-300" />
+            <span>온기 보상 상점 🎁</span>
+          </button>
+        </div>
+
         {/* 온기 지수 게이지 */}
-        <div className="w-full max-w-xs mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
+        <div className="w-full max-w-xs mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
           <div className="flex items-center gap-1 text-slate-400">
             <ThermometerSun className="w-3.5 h-3.5 text-amber-400" />
             <span>밤하늘 온기 지수</span>
@@ -680,6 +715,11 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         rewardType="candle"
         onRewardClaimed={() => {
           setCandleCount((prev) => prev + 5);
+          setUserWarmth((prev) => {
+            const next = prev + 5;
+            if (typeof window !== 'undefined') localStorage.setItem('logmate_user_warmth', next.toString());
+            return next;
+          });
           soundscape.playCandleChime();
 
           const burstSparks = [
@@ -697,7 +737,56 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         }}
       />
 
-      {/* 7. 알림 토스트 */}
+      {/* 7. 온기 보상 상점 모달 */}
+      <WarmthShopModal
+        isOpen={isWarmthShopOpen}
+        onClose={() => setIsWarmthShopOpen(false)}
+        userWarmth={userWarmth}
+        onRedeemPass={() => {
+          if (userWarmth < 30) return;
+          const next = userWarmth - 30;
+          setUserWarmth(next);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('logmate_user_warmth', next.toString());
+            localStorage.setItem('logmate_has_pass', 'true');
+          }
+          setToastMessage('🎉 축하합니다! 광고 없는 1일 이용권이 활성화되었습니다.');
+          setTimeout(() => setToastMessage(null), 3000);
+          setIsWarmthShopOpen(false);
+        }}
+        onRedeemSimilar={() => {
+          if (userWarmth < 5) return;
+          const next = userWarmth - 5;
+          setUserWarmth(next);
+          if (typeof window !== 'undefined') localStorage.setItem('logmate_user_warmth', next.toString());
+          setToastMessage('🔓 숨겨진 공감 사연 3편이 잠금 해제되었습니다!');
+          setTimeout(() => setToastMessage(null), 3000);
+          setIsWarmthShopOpen(false);
+        }}
+        onRedeemGoldenCandle={() => {
+          if (userWarmth < 10) return;
+          const next = userWarmth - 10;
+          setUserWarmth(next);
+          if (typeof window !== 'undefined') localStorage.setItem('logmate_user_warmth', next.toString());
+          setToastMessage('🌟 오늘 내 사연에 황금 온기 촛불이 부착되었습니다!');
+          setTimeout(() => setToastMessage(null), 3000);
+          setIsWarmthShopOpen(false);
+        }}
+        onRedeemBadge={() => {
+          if (userWarmth < 50) return;
+          const next = userWarmth - 50;
+          setUserWarmth(next);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('logmate_user_warmth', next.toString());
+            localStorage.setItem('logmate_user_title', '따뜻한 등대지기');
+          }
+          setToastMessage('👑 명예 칭호 "따뜻한 등대지기"를 획득하셨습니다!');
+          setTimeout(() => setToastMessage(null), 3000);
+          setIsWarmthShopOpen(false);
+        }}
+      />
+
+      {/* 8. 알림 토스트 */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
