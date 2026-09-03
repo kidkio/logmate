@@ -368,6 +368,24 @@ class FailureStore {
     return failure;
   }
 
+  // 회원 탈퇴 시 모든 작성 사연 및 온기 쪽지 영구 파기
+  async deleteUserData(userId: string, deviceId?: string): Promise<void> {
+    await this.init();
+    const toDelete: string[] = [];
+    for (const [id, f] of this.failures.entries()) {
+      if (f.userId === userId || (deviceId && f.deviceId === deviceId && !f.userId)) {
+        toDelete.push(id);
+      }
+    }
+    toDelete.forEach((id) => this.failures.delete(id));
+    await this.persistFailures();
+
+    this.comfortNotes = this.comfortNotes.filter(
+      (n) => n.targetUserId !== userId
+    );
+    await this.persistNotes();
+  }
+
   private enrichWithUserReactions(failure: Failure, deviceId?: string): Failure {
     if (!deviceId) return { ...failure, userReactions: [] };
     const userKey = `${failure.id}:${deviceId}`;

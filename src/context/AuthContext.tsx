@@ -11,6 +11,7 @@ interface AuthContextType {
   loginWithSocial: (provider: 'kakao' | 'google') => Promise<{ success: boolean; error?: string }>;
   loginGuest: () => Promise<void>;
   logout: () => Promise<void>;
+  withdrawAccount: (deviceId?: string) => Promise<{ success: boolean; error?: string }>;
   updateNickname: (newNickname: string) => void;
 }
 
@@ -190,6 +191,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  // 7. 회원 탈퇴 (모든 데이터 영구 파기)
+  const withdrawAccount = async (deviceId?: string) => {
+    setIsLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('logmate_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch('/api/auth/withdraw', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          deviceId,
+          isGuest: user?.provider === 'guest',
+          userId: user?.id,
+        }),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+    localStorage.removeItem('logmate_user');
+    localStorage.removeItem('logmate_token');
+    localStorage.removeItem('logmate_has_pass');
+    localStorage.removeItem('logmate_onboarded');
+    localStorage.removeItem('logmate_just_signed_up');
+    setUser(null);
+    setIsLoading(false);
+    return { success: true };
+  };
+
   const updateNickname = (newNickname: string) => {
     if (!user) return;
     const updated = { ...user, nickname: newNickname };
@@ -207,6 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWithSocial,
         loginGuest,
         logout,
+        withdrawAccount,
         updateNickname,
       }}
     >

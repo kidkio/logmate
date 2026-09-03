@@ -168,3 +168,13 @@ export async function deleteSession(token: string): Promise<void> {
   const filtered = sessions.filter((s) => s.token !== token);
   await writeSessions(filtered);
 }
+
+export async function deleteUser(userId: string): Promise<void> {
+  const users = await readUsers();
+  const filteredUsers = users.filter((u) => u.id !== userId);
+  await writeUsers(filteredUsers);
+
+  const sessions = await readSessions();
+  const filteredSessions = sessions.filter((s) => s.userId !== userId);
+  await writeSessions(filteredSessions);
+}
