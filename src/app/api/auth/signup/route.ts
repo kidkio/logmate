@@ -25,10 +25,12 @@ export async function POST(req: NextRequest) {
       createdAt: user.createdAt,
     };
 
+    const isSecure = req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https';
+
     const response = NextResponse.json({ success: true, user: safeUser });
     response.cookies.set('logmate_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecure,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 30, // 30일
