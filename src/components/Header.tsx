@@ -26,9 +26,14 @@ export function Header({
               <Moon className="w-5 h-5 fill-white/20" />
             </div>
             <div>
-              <span className="text-xs font-semibold tracking-wider text-indigo-400 uppercase">
-                오늘의 실패
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-extrabold tracking-wider text-indigo-400 uppercase">
+                  LogMate
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                  · 로그메이트
+                </span>
+              </div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight flex items-center gap-1.5">
                 오늘 당신의 실패를 공유하세요
               </h1>

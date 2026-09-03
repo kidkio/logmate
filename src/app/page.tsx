@@ -224,7 +224,7 @@ export default function HomePage() {
 
       {/* 푸터 */}
       <footer className="w-full border-t border-slate-900 py-6 text-center text-xs text-slate-500">
-        <p>© 오늘의 실패 · 당신만 그런 것이 아닙니다. 털어놓고 내일을 맞이하세요.</p>
+        <p>© LogMate (로그메이트) · 실패를 털어놓을 가장 다정한 친구. 당신만 그런 것이 아닙니다.</p>
       </footer>
 
       {/* 작성 직후 유사 실패 AI 매칭 모달 */}
