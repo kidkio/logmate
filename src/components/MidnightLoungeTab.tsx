@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Flame, Sparkles, Volume2, VolumeX, Moon, Heart, Send, Waves, Wind, CloudRain, Clock, ThermometerSun } from 'lucide-react';
+import { Flame, Sparkles, Volume2, VolumeX, Moon, Heart, Send, Waves, Wind, CloudRain, Clock, ThermometerSun, ExternalLink } from 'lucide-react';
 import { soundscape, SoundMode } from '@/lib/soundscape';
 import { User } from '@/types';
+import { RewardedAdModal } from './RewardedAdModal';
+import { Toast } from './Toast';
 
 interface WhisperItem {
   id: string;
@@ -37,6 +39,8 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   const [rippleActive, setRippleActive] = useState(false);
   const [likedWhispers, setLikedWhispers] = useState<Set<string>>(new Set());
   const [floatingSparks, setFloatingSparks] = useState<FloatingSpark[]>([]);
+  const [isRewardedAdOpen, setIsRewardedAdOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // 사운드스케이프 상태
   const [soundMode, setSoundMode] = useState<SoundMode>(soundscape.getMode());
@@ -333,14 +337,25 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           </p>
         </div>
 
-        {/* 인터랙티브 탭 버튼 */}
-        <button
-          onClick={handleLightCandle}
-          className="mt-3 py-2 px-5 rounded-2xl text-xs font-bold text-amber-300 bg-amber-950/70 border border-amber-500/40 hover:bg-amber-900/70 active:scale-95 transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)] flex items-center gap-1.5"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin duration-3000" />
-          <span>온기 촛불 켜기 (+1)</span>
-        </button>
+        {/* 인터랙티브 탭 버튼 & 5배 부스터 */}
+        <div className="flex flex-col sm:flex-row items-center gap-2 mt-3 w-full max-w-xs justify-center">
+          <button
+            onClick={handleLightCandle}
+            className="w-full sm:w-auto flex-1 py-2 px-4 rounded-2xl text-xs font-bold text-amber-300 bg-amber-950/70 border border-amber-500/40 hover:bg-amber-900/70 active:scale-95 transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)] flex items-center justify-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin duration-3000" />
+            <span>온기 촛불 켜기 (+1)</span>
+          </button>
+
+          <button
+            onClick={() => setIsRewardedAdOpen(true)}
+            className="w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold text-pink-200 bg-pink-950/70 border border-pink-500/40 hover:bg-pink-900/70 active:scale-95 transition-all shadow-[0_0_20px_rgba(236,72,153,0.25)] flex items-center justify-center gap-1.5"
+            title="15초 광고 시청 후 온기 5개 즉시 충전"
+          >
+            <Flame className="w-3.5 h-3.5 text-pink-400 fill-pink-400 animate-pulse" />
+            <span>5배 부스터 (+5 🕯️)</span>
+          </button>
+        </div>
 
         {/* 온기 지수 게이지 */}
         <div className="w-full max-w-xs mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
@@ -553,6 +568,67 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           })}
         </div>
       </div>
+
+      {/* 5. 심야 꿀잠 테라피 큐레이션 (쿠팡 파트너스 맥락 제휴) */}
+      <div className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900 to-black space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+            <span>🍵 심야 꿀잠 테라피</span>
+          </span>
+          <span className="text-[10px] text-slate-500 font-mono">Coupang Partners</span>
+        </div>
+        <div className="space-y-0.5">
+          <h4 className="text-xs font-bold text-slate-200">
+            유기농 캐모마일 & 타트체리 꿀잠 티 (40티백)
+          </h4>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            스트레스로 뒤척이는 밤, 뇌파를 부드럽게 이완시켜주는 따뜻한 수면 유도 허브차.
+          </p>
+        </div>
+        <div className="flex items-center justify-between text-xs bg-black/40 px-3 py-2 rounded-xl border border-white/10">
+          <span className="text-amber-300 font-bold font-mono">18,900원 (32% 특가)</span>
+          <span className="text-[10px] text-slate-400">4.9 ★★★★★</span>
+        </div>
+        <a
+          href="https://www.coupang.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20"
+        >
+          <span>로켓배송 최저가 둘러보기</span>
+          <ExternalLink className="w-3 h-3" />
+        </a>
+        <p className="text-[9px] text-slate-500 text-center leading-tight">
+          *이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+        </p>
+      </div>
+
+      {/* 6. 15초 리워드 보상형 동영상 광고 모달 */}
+      <RewardedAdModal
+        isOpen={isRewardedAdOpen}
+        onClose={() => setIsRewardedAdOpen(false)}
+        rewardType="candle"
+        onRewardClaimed={() => {
+          setCandleCount((prev) => prev + 5);
+          soundscape.playCandleChime();
+
+          const burstSparks = [
+            { id: Date.now() + 1, text: '🕯️ +5 온기', vx: 0, vy: -120, rotate: 0, scale: 1.4, delay: 0 },
+            { id: Date.now() + 2, text: '✨ 부스터', vx: -45, vy: -95, rotate: -15, scale: 1.1, delay: 50 },
+            { id: Date.now() + 3, text: '💛 온기', vx: 50, vy: -105, rotate: 15, scale: 1.2, delay: 90 },
+          ];
+          setFloatingSparks((prev) => [...prev, ...burstSparks]);
+          setTimeout(() => {
+            setFloatingSparks((prev) => prev.filter((s) => !burstSparks.some((b) => b.id === s.id)));
+          }, 1400);
+
+          setToastMessage('온기 5배 부스터가 적용되었습니다! ✨ (+5 온기)');
+          setTimeout(() => setToastMessage(null), 3000);
+        }}
+      />
+
+      {/* 7. 알림 토스트 */}
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
 }

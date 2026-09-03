@@ -21,9 +21,13 @@ import {
   Award,
   ArrowDown,
   PenLine,
-  ExternalLink
+  ExternalLink,
+  LockOpen
 } from 'lucide-react';
 import { SendComfortNoteModal } from './SendComfortNoteModal';
+
+import { RewardedAdModal } from './RewardedAdModal';
+import { Toast } from './Toast';
 
 interface FailureShortsFeedProps {
   similarFailures: Failure[];
@@ -38,10 +42,72 @@ interface FailureShortsFeedProps {
   onOpenWriteGate?: () => void;
 }
 
+interface CoupangProduct {
+  id: string;
+  badge: string;
+  title: string;
+  description: string;
+  price: string;
+  discount: string;
+  rating: string;
+  cta: string;
+  url: string;
+  icon: string;
+  color: string;
+  border: string;
+}
+
+const COUPANG_AFFILIATE_PRODUCTS: CoupangProduct[] = [
+  {
+    id: 'tea_sleep',
+    badge: '심야 숙면 1위',
+    title: '유기농 캐모마일 & 타트체리 꿀잠 티 (40티백)',
+    description: '불안과 자책으로 뒤척이는 밤, 뇌파를 이완시켜주는 따뜻한 잠자리 허브티. 오늘 밤 나에게 편안한 수면을 선물하세요.',
+    price: '18,900원',
+    discount: '32% 특가',
+    rating: '4.9 ★★★★★ (2,410개 꿀잠 후기)',
+    cta: '쿠팡 로켓배송 최저가 보기',
+    url: 'https://www.coupang.com',
+    icon: '🍵',
+    color: 'from-amber-950/70 to-emerald-950/70',
+    border: 'border-amber-500/40',
+  },
+  {
+    id: 'book_comfort',
+    badge: '치유 베스트셀러',
+    title: '내가 틀릴 수도 있습니다 (비욘 나티코 린데블라드 저)',
+    description: '17년간 숲속 승려로 살며 배운 "자책하지 않고 나를 용서하는 법". 지친 밤 마음에 완전한 평화를 주는 도서.',
+    price: '16,200원',
+    discount: '10% 할인',
+    rating: '4.9 ★★★★★ (4,820개 독자 평점)',
+    cta: '쿠팡 도서 상세 보기',
+    url: 'https://www.coupang.com',
+    icon: '📖',
+    color: 'from-purple-950/70 to-indigo-950/70',
+    border: 'border-purple-500/40',
+  },
+  {
+    id: 'candle_mist',
+    badge: '아로마 테라피',
+    title: '천연 라벤더 아로마 소이 캔들 & 필로우 미스트 세트',
+    description: '베개에 한 번 뿌려주면 침실 가득 퍼지는 라벤더 숲의 향기. 깊은 호흡과 함께 긴장이 사르르 녹아내립니다.',
+    price: '21,500원',
+    discount: '25% 할인',
+    rating: '4.8 ★★★★★ (1,150개 만족 후기)',
+    cta: '힐링 아로마 키트 보기',
+    url: 'https://www.coupang.com',
+    icon: '🕯️',
+    color: 'from-pink-950/70 to-rose-950/70',
+    border: 'border-pink-500/40',
+  },
+];
+
 type FeedItem =
   | { type: 'similar'; failure: Failure; rank: number }
   | { type: 'similar_exhausted'; count: number }
-  | { type: 'ad'; adId: string }
+  | { type: 'ad_adsense' }
+  | { type: 'ad_coupang'; product: CoupangProduct }
+  | { type: 'ad_reward' }
   | { type: 'community'; failure: Failure }
   | { type: 'closure' }
   | { type: 'empty' };
@@ -78,58 +144,6 @@ const REACTION_CONFIG: {
   },
 ];
 
-interface CommercialAd {
-  id: string;
-  sponsor: string;
-  category: string;
-  title: string;
-  description: string;
-  cta: string;
-  url: string;
-  tag: string;
-  accentColor: string;
-  borderColor: string;
-}
-
-const REAL_COMMERCIAL_ADS: CommercialAd[] = [
-  {
-    id: 'millie_audiobook',
-    sponsor: '밀리의서재',
-    category: '오디오북 · 독서 쉼터',
-    title: '“잠 못 드는 밤, 차분하게 생각을 비우는 이야기”',
-    description: '불안과 자책 대신 다정한 목소리의 오디오북으로 편안하게 잠에 빠져보세요.',
-    cta: '첫 달 무료로 힐링 오디오북 듣기',
-    url: 'https://www.millie.co.kr',
-    tag: '신규 가입 1개월 무료',
-    accentColor: 'from-amber-950/70 to-purple-950/70',
-    borderColor: 'border-amber-500/40',
-  },
-  {
-    id: 'baemin_night',
-    sponsor: '배달의민족',
-    category: '심야 위로 푸드',
-    title: '“고생한 오늘 하루, 나를 위한 따뜻한 한 끼”',
-    description: '속이 따뜻해야 마음도 든든해집니다. 오늘 밤 나에게 맛있는 위로를 선물하세요.',
-    cta: '심야 힐링 배달 쿠폰팩 받기',
-    url: 'https://www.baemin.com',
-    tag: '심야 전용 5,000원 쿠폰팩',
-    accentColor: 'from-cyan-950/70 to-blue-950/70',
-    borderColor: 'border-cyan-500/40',
-  },
-  {
-    id: 'sleep_care',
-    sponsor: '마인드풀 슬립테크',
-    category: '웰니스 · 수면 테라피',
-    title: '“오늘 밤은 뒤척이지 않고 깊은 수면 속으로”',
-    description: '스트레스로 지친 뇌파를 안정시키는 천연 캐모마일 & 타트체리 릴랙스 케어.',
-    cta: '꿀잠 릴랙스 키트 둘러보기',
-    url: 'https://smartstore.naver.com',
-    tag: '무료 배송 혜택',
-    accentColor: 'from-emerald-950/70 to-teal-950/70',
-    borderColor: 'border-emerald-500/40',
-  },
-];
-
 export function FailureShortsFeed({
   similarFailures,
   otherFailures,
@@ -161,9 +175,9 @@ export function FailureShortsFeed({
       });
     });
 
-    // [단계 2] 유사 사연 3종 직후 광고 (패스 미보유 시)
+    // [단계 2] 유사 사연 3종 직후 광고 (패스 미보유 시): 구글 애드센스 네이티브 인피드
     if (!hasPass && topSimilar.length > 0) {
-      items.push({ type: 'ad', adId: 'ad_post_top3' });
+      items.push({ type: 'ad_adsense' });
     }
 
     // [단계 3] 비슷한 사연 소진 알림 및 라운지/캘린더 유도 전환 카드!
@@ -174,11 +188,22 @@ export function FailureShortsFeed({
       });
     }
 
-    // [단계 4] 모두의 커뮤니티 사연 (반영구적 세로 스크롤) + 4편마다 광고 삽입
+    // [단계 4] 모두의 커뮤니티 사연 (반영구적 세로 스크롤) + 3가지 광고 모델 순차 교차 삽입
     others.forEach((failure, idx) => {
       items.push({ type: 'community', failure });
-      if (!hasPass && (idx + 1) % 4 === 0) {
-        items.push({ type: 'ad', adId: `ad_community_${idx + 1}` });
+      if (!hasPass && (idx + 1) % 3 === 0) {
+        const cycle = Math.floor((idx + 1) / 3) % 3;
+        if (cycle === 1) {
+          // 쿠팡 파트너스 심야 힐링 상품
+          const pIdx = Math.floor((idx + 1) / 6) % COUPANG_AFFILIATE_PRODUCTS.length;
+          items.push({ type: 'ad_coupang', product: COUPANG_AFFILIATE_PRODUCTS[pIdx] });
+        } else if (cycle === 2) {
+          // 보상형 동영상 리워드 광고 (사연 3개 추가 해금)
+          items.push({ type: 'ad_reward' });
+        } else {
+          // 구글 애드센스 인피드 단위
+          items.push({ type: 'ad_adsense' });
+        }
       }
     });
 
@@ -190,6 +215,8 @@ export function FailureShortsFeed({
   const [activeIndex, setActiveIndex] = useState(0);
   const [targetNoteFailure, setTargetNoteFailure] = useState<Failure | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [isRewardedAdOpen, setIsRewardedAdOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -250,10 +277,19 @@ export function FailureShortsFeed({
               <Flame className="w-3 h-3 text-amber-400" />
               <span>닮은 사연 완독</span>
             </span>
-          ) : items[activeIndex]?.type === 'ad' ? (
+          ) : items[activeIndex]?.type === 'ad_adsense' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-black/70 backdrop-blur-md border border-indigo-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+              <span>Google AdSense · 스폰서</span>
+            </span>
+          ) : items[activeIndex]?.type === 'ad_coupang' ? (
             <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/70 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
-              <Video className="w-3 h-3 text-amber-400" />
-              <span>스폰서 꿀잠 쉼터</span>
+              <span>🍵 심야 힐링 제휴 쉼터</span>
+            </span>
+          ) : items[activeIndex]?.type === 'ad_reward' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-pink-300 bg-black/70 backdrop-blur-md border border-pink-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <Video className="w-3 h-3 text-pink-400" />
+              <span>15초 리워드 보상</span>
             </span>
           ) : items[activeIndex]?.type === 'closure' ? (
             <span className="flex items-center gap-1 text-[11px] font-bold text-purple-300 bg-black/70 backdrop-blur-md border border-purple-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
@@ -460,68 +496,138 @@ export function FailureShortsFeed({
                 </div>
               ) : null}
 
-              {/* [카드 타입 C: 실제 상업 스폰서 광고 및 프리미엄 결제 유도] */}
-              {item.type === 'ad' ? (
-                (() => {
-                  const adIndex = Math.abs(idx) % REAL_COMMERCIAL_ADS.length;
-                  const ad = REAL_COMMERCIAL_ADS[adIndex];
+              {/* [카드 타입 C-1: 구글 애드센스 반응형 인피드 광고 단위] */}
+              {item.type === 'ad_adsense' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                  <div className="my-auto space-y-3.5 max-w-sm mx-auto glass-card p-5 sm:p-6 rounded-3xl border border-indigo-500/40 bg-gradient-to-b from-indigo-950/70 via-slate-900 to-black shadow-[0_0_40px_rgba(99,102,241,0.25)]">
+                    {/* 상단 스폰서 배지 & 카테고리 */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-indigo-300 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                        <span>Google AdSense · In-Feed</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-semibold">후원 스폰서</span>
+                    </div>
 
-                  return (
-                    <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
-                      <div className={`my-auto space-y-3.5 max-w-sm mx-auto glass-card p-5 sm:p-6 rounded-3xl border ${ad.borderColor} bg-gradient-to-b ${ad.accentColor} shadow-[0_0_40px_rgba(0,0,0,0.5)]`}>
-                        {/* 상단 스폰서 배지 & 카테고리 */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] uppercase font-bold text-amber-400 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                            <span>Sponsored · {ad.sponsor}</span>
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-semibold">{ad.category}</span>
-                        </div>
-
-                        {/* 실제 광고 제목 및 설명 */}
-                        <div className="space-y-1.5 text-left pt-1">
-                          <h3 className="text-sm sm:text-base font-black text-slate-100 leading-snug">
-                            {ad.title}
-                          </h3>
-                          <p className="text-xs text-slate-300 leading-relaxed">
-                            {ad.description}
-                          </p>
-                        </div>
-
-                        {/* 광고 혜택 배지 */}
-                        <div className="flex items-center justify-between px-1 text-[11px] text-amber-300/90 bg-white/[0.03] p-2 rounded-xl border border-white/[0.06]">
-                          <span className="font-medium">특별 제휴 혜택</span>
-                          <span className="font-bold">{ad.tag}</span>
-                        </div>
-
-                        {/* 1. 실제 광고 랜딩페이지 이동 CTA */}
-                        <a
-                          href={ad.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-3 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 transition-all"
-                        >
-                          <span>{ad.cta}</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-
-                        {/* 2. 유료 이용권 구매 (광고 제거) 유도 */}
-                        <button
-                          onClick={onOpenPassModal}
-                          className="w-full py-2 rounded-xl font-semibold text-[11px] text-slate-400 hover:text-slate-200 bg-black/40 hover:bg-black/60 border border-white/10 active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all"
-                        >
-                          <Ticket className="w-3.5 h-3.5 text-amber-400" />
-                          <span>🎟️ 광고 없이 무제한으로 보기 (이용권)</span>
-                        </button>
+                    {/* 애드센스 컨테이너 */}
+                    <div className="rounded-2xl bg-black/50 border border-white/[0.08] p-4 text-left space-y-2">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500">
+                        <span className="font-mono">AD #3037502282</span>
+                        <span className="bg-white/[0.05] px-1.5 py-0.5 rounded text-[9px]">Google</span>
                       </div>
-
-                      <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
-                        <span>아래로 스와이프하여 사연 계속 보기</span>
-                        <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                      <h4 className="text-sm font-bold text-slate-100 leading-snug">
+                        오늘 밤, 마음의 쉼표를 찍는 안식처
+                      </h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        불안과 고민을 덜어내는 심야 멘탈 웰니스 및 맞춤형 스폰서 추천 공간입니다.
+                      </p>
+                      <div className="pt-1">
+                        <span className="text-[11px] text-indigo-400 font-medium">
+                          맞춤형 파트너 솔루션 둘러보기 &rarr;
+                        </span>
                       </div>
                     </div>
-                  );
-                })()
+
+                    {/* 이용권 결제 유도 */}
+                    <button
+                      onClick={onOpenPassModal}
+                      className="w-full py-2 rounded-xl font-semibold text-[11px] text-slate-400 hover:text-slate-200 bg-black/40 hover:bg-black/60 border border-white/10 active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <Ticket className="w-3.5 h-3.5 text-amber-400" />
+                      <span>🎟️ 광고 없이 무제한으로 보기 (이용권)</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
+                    <span>아래로 스와이프하여 사연 계속 보기</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* [카드 타입 C-2: 쿠팡 파트너스 심야 감성 맥락 매칭 제휴 상품] */}
+              {item.type === 'ad_coupang' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                  <div className={`my-auto space-y-3.5 max-w-sm mx-auto glass-card p-5 sm:p-6 rounded-3xl border ${item.product.border} bg-gradient-to-b ${item.product.color} shadow-[0_0_40px_rgba(0,0,0,0.5)] text-left`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-amber-300 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 flex items-center gap-1.5">
+                        <span>{item.product.icon} {item.product.badge}</span>
+                      </span>
+                      <span className="text-[10px] text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30 font-mono">
+                        {item.product.discount}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <h3 className="text-sm sm:text-base font-black text-slate-100 leading-snug">
+                        {item.product.title}
+                      </h3>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {item.product.description}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs bg-black/40 p-2.5 rounded-xl border border-white/10">
+                      <span className="text-amber-300 font-black text-sm font-mono">{item.product.price}</span>
+                      <span className="text-[10px] text-slate-400">{item.product.rating}</span>
+                    </div>
+
+                    <a
+                      href={item.product.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 via-pink-500 to-indigo-500 hover:from-amber-600 hover:to-indigo-600 active:scale-[0.98] shadow-lg shadow-amber-500/25 flex items-center justify-center gap-1.5 transition-all text-center"
+                    >
+                      <span>{item.product.cta}</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+
+                    <p className="text-[9px] text-slate-500 text-center leading-tight">
+                      *이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
+                    <span>아래로 스와이프하여 사연 계속 보기</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* [카드 타입 C-3: 보상형 동영상 광고 모달 트리거 카드] */}
+              {item.type === 'ad_reward' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                  <div className="my-auto space-y-4 max-w-sm mx-auto glass-card p-6 rounded-3xl border border-pink-500/40 bg-gradient-to-b from-pink-950/70 via-slate-900 to-black shadow-[0_0_50px_rgba(236,72,153,0.25)] text-center">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-pink-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/30 animate-pulse">
+                      <LockOpen className="w-7 h-7" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-pink-300 bg-pink-950/80 border border-pink-500/40 px-2.5 py-0.5 rounded-full">
+                        Google AdMob · 리워드 보상
+                      </span>
+                      <h3 className="text-base font-black text-slate-100">
+                        숨겨진 공감 사연 3편 더 열어보기
+                      </h3>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        15초의 짧은 힐링 영상을 시청하시면 나와 가장 닮은 특별 사연 3편이 즉시 잠금 해제됩니다.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => setIsRewardedAdOpen(true)}
+                      className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 active:scale-[0.98] shadow-lg shadow-pink-500/30 flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <Video className="w-3.5 h-3.5 text-white" />
+                      <span>15초 영상 보고 사연 열기</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
+                    <span>아래로 스와이프하여 사연 계속 보기</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                </div>
               ) : null}
 
               {/* [카드 타입 D: 오늘의 안식처 완성 엔딩 카드] */}
@@ -656,6 +762,20 @@ export function FailureShortsFeed({
           setTargetNoteFailure(null);
         }}
       />
+
+      {/* 5. 15초 리워드 보상형 동영상 광고 모달 */}
+      <RewardedAdModal
+        isOpen={isRewardedAdOpen}
+        onClose={() => setIsRewardedAdOpen(false)}
+        rewardType="similar_failures"
+        onRewardClaimed={() => {
+          setToastMessage('🎉 보상 획득! 숨겨진 공감 사연 3편이 열렸습니다 🔓');
+          setTimeout(() => setToastMessage(null), 3000);
+        }}
+      />
+
+      {/* 6. 알림 토스트 */}
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
 }
