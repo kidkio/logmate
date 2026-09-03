@@ -305,6 +305,7 @@ function MainApp() {
                   onReport={(id) => setReportingFailureId(id)}
                   hasPass={hasPass}
                   onOpenPassModal={() => setIsPassModalOpen(true)}
+                  onNavigateTab={(tab) => setActiveTab(tab)}
                 />
               )}
             </div>

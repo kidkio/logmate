@@ -16,10 +16,15 @@ import {
   Trophy,
   Medal,
   Award,
-  Mail
+  Mail,
+  Moon,
+  Calendar,
+  RotateCcw,
+  Volume2
 } from 'lucide-react';
 import { FailureCard } from './FailureCard';
 import { SendComfortNoteModal } from './SendComfortNoteModal';
+import { soundscape } from '@/lib/soundscape';
 
 interface FailureShortsFeedProps {
   similarFailures: Failure[];
@@ -30,10 +35,11 @@ interface FailureShortsFeedProps {
   onReport: (failureId: string) => void;
   hasPass: boolean;
   onOpenPassModal: () => void;
+  onNavigateTab?: (tab: 'today' | 'explore' | 'archive') => void;
 }
 
 interface FeedItem {
-  type: 'similar' | 'community' | 'ad';
+  type: 'similar' | 'community' | 'ad' | 'closure';
   failure?: Failure;
   rank?: number; // 1, 2, 3 (유사 사연 순위)
   adId?: string;
@@ -80,6 +86,7 @@ export function FailureShortsFeed({
   onReport,
   hasPass,
   onOpenPassModal,
+  onNavigateTab,
 }: FailureShortsFeedProps) {
   // 1. 유사한 3종 사연을 최우선으로 배치!
   const top3 = similarFailures.slice(0, 3);
@@ -111,11 +118,25 @@ export function FailureShortsFeed({
     }
   });
 
+  // [4단계] 모든 사연 관람 완료 후 안식처 엔딩 카드
+  items.push({ type: 'closure' });
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0); // 0 ~ 100
   const [isHolding, setIsHolding] = useState(false);
   const [isListDrawerOpen, setIsListDrawerOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [isSleeping, setIsSleeping] = useState(false);
+
+  const handleSleepMode = () => {
+    if (isSleeping) {
+      soundscape.stop();
+      setIsSleeping(false);
+    } else {
+      soundscape.play('rain');
+      setIsSleeping(true);
+    }
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,6 +169,12 @@ export function FailureShortsFeed({
 
   // 인스타 스타일 프로그레스 대시바 타이머
   useEffect(() => {
+    if (currentItem?.type === 'closure') {
+      setProgress(100);
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+
     if (isHolding || isListDrawerOpen || isNoteModalOpen) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
@@ -238,6 +265,8 @@ export function FailureShortsFeed({
                   className={`h-full transition-all duration-75 ${
                     item.type === 'ad'
                       ? 'bg-amber-400'
+                      : item.type === 'closure'
+                      ? 'bg-gradient-to-r from-purple-400 to-emerald-400'
                       : isTop3
                       ? 'bg-gradient-to-r from-pink-500 to-indigo-400'
                       : 'bg-slate-400'
@@ -263,6 +292,11 @@ export function FailureShortsFeed({
               <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
                 <Video className="w-3 h-3 text-amber-400" />
                 <span>스폰서 광고 ({Math.ceil(((100 - progress) / 100) * 5)}s)</span>
+              </span>
+            ) : currentItem?.type === 'closure' ? (
+              <span className="flex items-center gap-1 text-[11px] font-bold text-purple-300 bg-purple-950/80 border border-purple-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(168,85,247,0.3)]">
+                <Moon className="w-3 h-3 text-purple-400" />
+                <span>오늘의 안식처 완성 🌙</span>
               </span>
             ) : currentItem?.type === 'similar' ? (
               <span className="flex items-center gap-1 text-[11px] font-bold text-pink-300 bg-pink-950/80 border border-pink-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(236,72,153,0.3)]">
@@ -305,9 +339,95 @@ export function FailureShortsFeed({
         </div>
       </div>
 
-      {/* 2. 중앙 메인 콘텐츠: [유사 사연 1~3위] or [광고] or [일반 사연] */}
+      {/* 2. 중앙 메인 콘텐츠: [안식처 여정 완료] or [유사 사연 1~3위] or [광고] or [일반 사연] */}
       <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-4 sm:px-6 py-2 overflow-hidden">
-        {isAd ? (
+        {currentItem?.type === 'closure' ? (
+          /* [안식처 여정 완료 엔딩 카드] */
+          <div className="w-full flex flex-col justify-between h-full py-2 sm:py-3 px-1 text-center animate-in zoom-in-95 duration-300">
+            <div className="my-auto space-y-3 sm:space-y-4">
+              {/* 반짝이는 달빛 아우라 아이콘 */}
+              <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 blur-xl opacity-60 animate-pulse" />
+                <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 border border-white/20 flex items-center justify-center text-white shadow-[0_0_30px_rgba(168,85,247,0.5)]">
+                  <Moon className="w-7 h-7 sm:w-8 sm:h-8 fill-white/20 text-white" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 bg-purple-950/80 border border-purple-500/40 px-3 py-1 rounded-full text-[11px] font-bold text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.25)]">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                  <span>오늘의 안식처 여정 완료</span>
+                </span>
+                <h2 className="text-lg sm:text-xl font-black text-slate-100 tracking-tight leading-snug">
+                  오늘 하루도<br />참 고생 많으셨어요
+                </h2>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                  오늘 털어놓은 당신의 실패는 부끄러운 상처가 아닌,<br />
+                  내일의 당신을 더 단단하게 만들어 줄 디딤돌입니다.<br />
+                  어둠 속에서도 함께 걷는 이웃들이 곁에 있어요.
+                </p>
+              </div>
+
+              {/* 오늘의 나눔 요약 칩 */}
+              <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto pt-1">
+                <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-2.5">
+                  <span className="text-[10px] text-slate-500 block">함께 나눈 사연</span>
+                  <span className="text-xs sm:text-sm font-black text-indigo-300">{top3.length + others.length}편 완독 📚</span>
+                </div>
+                <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-2.5">
+                  <span className="text-[10px] text-slate-500 block">나와 닮은 최고 공감</span>
+                  <span className="text-xs sm:text-sm font-black text-pink-300">
+                    {top3[0]?.similarityScore || 89}% 일치 💖
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3가지 감성 액션 버튼 */}
+            <div className="space-y-2 pt-2 relative z-20 w-full max-w-xs mx-auto flex-shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSleepMode();
+                }}
+                className={`w-full py-2.5 sm:py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                  isSleeping
+                    ? 'bg-emerald-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]'
+                    : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-[0_0_25px_rgba(99,102,241,0.4)] hover:opacity-95'
+                }`}
+              >
+                <Volume2 className="w-4 h-4" />
+                <span>{isSleeping ? '🌧️ 빗소리와 함께 잠드는 중...' : '🎧 편안한 빗소리 들으며 잠들기'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigateTab?.('archive');
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-white/[0.06] hover:bg-white/[0.1] text-slate-200 border border-white/[0.1] flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              >
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <span>내 달빛 캘린더 & 보관함 가기</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentIndex(0);
+                  setProgress(0);
+                }}
+                className="w-full py-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-300 flex items-center justify-center gap-1 transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>처음 사연부터 다시 둘러보기</span>
+              </button>
+            </div>
+          </div>
+        ) : isAd ? (
           /* [자동 삽입된 숏츠 광고 카드] */
           <div className="w-full glass-card rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-amber-500/30 text-center space-y-3 shadow-[0_0_40px_rgba(245,158,11,0.2)] animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mx-auto shadow-[0_0_20px_rgba(245,158,11,0.3)]">
