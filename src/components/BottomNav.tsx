@@ -20,7 +20,7 @@ export function BottomNav({ activeTab, onChangeTab, myFailuresCount }: BottomNav
     },
     {
       id: 'explore' as TabType,
-      label: '실패 둘러보기',
+      label: '둘러보기',
       icon: Compass,
     },
     {
@@ -32,8 +32,9 @@ export function BottomNav({ activeTab, onChangeTab, myFailuresCount }: BottomNav
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/80">
-      <div className="max-w-md mx-auto px-6 h-16 flex items-center justify-around">
+    <nav className="fixed bottom-3.5 left-4 right-4 z-40 max-w-sm mx-auto">
+      {/* 21st.dev 스타일 플로팅 글래스 독 (Floating Glass Dock) */}
+      <div className="bg-slate-900/80 backdrop-blur-2xl border border-white/[0.1] rounded-2xl p-1.5 shadow-[0_10px_35px_rgba(0,0,0,0.8)] flex items-center justify-around">
         {navItems.map((item) => {
           const IconComponent = item.icon;
           const isActive = activeTab === item.id;
@@ -42,24 +43,27 @@ export function BottomNav({ activeTab, onChangeTab, myFailuresCount }: BottomNav
             <button
               key={item.id}
               onClick={() => onChangeTab(item.id)}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all relative ${
+              className={`flex-1 py-2 px-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${
                 isActive
-                  ? 'text-indigo-400 font-semibold'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'text-white font-bold bg-white/[0.08] shadow-[0_0_15px_rgba(99,102,241,0.2)]'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
               }`}
             >
               <div className="relative">
-                <IconComponent className={`w-5 h-5 transition-transform ${isActive ? 'scale-110' : ''}`} />
+                <IconComponent
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isActive ? 'scale-110 text-indigo-400' : ''
+                  }`}
+                />
                 {item.badge !== undefined && (
-                  <span className="absolute -top-1 -right-2.5 w-4 h-4 rounded-full bg-pink-500 text-[10px] text-white flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-2.5 w-3.5 h-3.5 rounded-full bg-pink-500 text-[9px] text-white flex items-center justify-center font-bold shadow-sm">
                     {item.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] tracking-tight">{item.label}</span>
-              {isActive && (
-                <div className="w-1 h-1 rounded-full bg-indigo-400 absolute bottom-0.5" />
-              )}
+              <span className={`text-[10px] tracking-tight ${isActive ? 'text-indigo-200 font-semibold' : ''}`}>
+                {item.label}
+              </span>
             </button>
           );
         })}
