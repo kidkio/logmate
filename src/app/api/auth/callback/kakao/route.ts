@@ -53,10 +53,7 @@ export async function GET(req: NextRequest) {
     const kakaoUser = await userRes.json();
     const kakaoId = kakaoUser.id;
     const kakaoEmail = kakaoUser.kakao_account?.email || `kakao_${kakaoId}@logmate.social`;
-    const kakaoNickname =
-      kakaoUser.properties?.nickname ||
-      kakaoUser.kakao_account?.profile?.nickname ||
-      generateAnonymousNickname();
+    const kakaoNickname = generateAnonymousNickname();
 
     // 3. 사용자 조회 또는 생성
     let user = await getUserByEmail(kakaoEmail);

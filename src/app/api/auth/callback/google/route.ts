@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
     const googleUser = await userRes.json();
     const googleEmail = googleUser.email;
-    const googleName = googleUser.name || generateAnonymousNickname();
+    const googleName = generateAnonymousNickname();
 
     if (!googleEmail) {
       return NextResponse.redirect(`${homeUrl}?auth_error=google_no_email`);

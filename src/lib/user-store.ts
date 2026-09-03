@@ -22,8 +22,17 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
-const ADJECTIVES = ['이불킥하는', '토닥이는', '서투른', '야근하는', '밤샘하는', '용감한', '작심삼일', '따뜻한', '덤벙대는', '길잃은', '꿈꾸는', '쉬어가는'];
-const NOUNS = ['펭귄', '쿼카', '다람쥐', '고양이', '햄스터', '수달', '곰돌이', '판다', '참새', '토끼', '고슴도치', '강아지'];
+const ADJECTIVES = [
+  '이불킥하는', '토닥이는', '서투른', '야근하는', '밤샘하는', '용감한',
+  '작심삼일', '따뜻한', '덤벙대는', '길잃은', '꿈꾸는', '쉬어가는',
+  '달빛품은', '지친하루의', '새벽감성', '고민많은', '별빛따라', '토닥토닥',
+  '마음여린', '꿋꿋한', '느긋한', '잠못드는'
+];
+const NOUNS = [
+  '펭귄', '쿼카', '다람쥐', '고양이', '햄스터', '수달',
+  '곰돌이', '판다', '참새', '토끼', '고슴도치', '강아지',
+  '부엉이', '알파카', '물범', '아기사슴', '코알라', '미어캣'
+];
 
 export function generateAnonymousNickname(): string {
   const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
@@ -118,7 +127,7 @@ export async function createUser(
     email: email.toLowerCase().trim(),
     passwordHash: hash,
     salt,
-    nickname: nickname?.trim() || generateAnonymousNickname(),
+    nickname: generateAnonymousNickname(),
     provider,
     createdAt: new Date().toISOString(),
   };

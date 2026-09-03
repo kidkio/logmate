@@ -68,7 +68,7 @@ export function LandingAuth() {
         setErrorMsg(res.error || '로그인에 실패했습니다.');
       }
     } else {
-      const res = await signupWithEmail(email, password, nickname);
+      const res = await signupWithEmail(email, password);
       if (!res.success) {
         setErrorMsg(res.error || '회원가입에 실패했습니다.');
       }
@@ -258,31 +258,15 @@ export function LandingAuth() {
             </div>
           </div>
 
-          {/* 회원가입 시: 익명 닉네임 선택 및 주사위 굴리기 */}
+          {/* 회원가입 시: 완전 익명 닉네임 자동 배정 안내 */}
           {mode === 'signup' && (
-            <div className="space-y-1 pt-1 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-slate-300">
-                  활동할 익명 닉네임 (실명 노출 방지)
-                </label>
-                <button
-                  type="button"
-                  onClick={handleRollNickname}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-                >
-                  <Dices className="w-3 h-3" />
-                  <span>새로고침</span>
-                </button>
+            <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/20 space-y-1 animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
+                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                <span>100% 완전 익명 닉네임 자동 배정</span>
               </div>
-              <input
-                type="text"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                required
-                className="w-full bg-indigo-950/30 text-indigo-200 rounded-xl px-3.5 py-2.5 text-xs border border-indigo-700/40 focus:border-indigo-500 outline-none font-bold"
-              />
-              <p className="text-[10px] text-slate-500">
-                * 다른 사람들에게는 오직 이 닉네임으로만 표시됩니다.
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                실명 노출을 원천 방지하기 위해 계정 생성 시 <span className="text-pink-300 font-semibold">&lsquo;따뜻한 쿼카 #123&rsquo;</span>과 같은 포근한 익명 닉네임이 무작위로 자동 지정됩니다.
               </p>
             </div>
           )}
