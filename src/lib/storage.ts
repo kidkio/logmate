@@ -1,7 +1,11 @@
 import { Failure, CategoryType, ReactionType, ReactionCounts, ComfortNote } from '@/types';
-import { INITIAL_SEED_FAILURES } from './seed-data';
 import { getEmbedding, cosineSimilarity, reviewModerationAI } from './gemini';
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs/promises';
+import path from 'path';
+
+const FAILURES_DATA_PATH = path.join(process.cwd(), 'data', 'failures.json');
+const NOTES_DATA_PATH = path.join(process.cwd(), 'data', 'notes.json');
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -26,7 +30,7 @@ export function getToday3AMKSTCutoff(): Date {
   return new Date(kstCutoffUtcTime);
 }
 
-// In-Memory 캐시 / Mock 저장소 (Supabase 미연결 시 로컬 개발 및 즉시 테스트 지원)
+// In-Memory 캐시 및 영구 JSON 파일 저장소
 class FailureStore {
   private failures: Map<string, Failure> = new Map();
   private userReactions: Map<string, Set<ReactionType>> = new Map(); // key: `${failureId}:${deviceId}`
@@ -37,15 +41,41 @@ class FailureStore {
     if (this.initialized) return;
     this.initialized = true;
 
-    // 시드 데이터 초기 임베딩 생성 및 등록
-    for (const seed of INITIAL_SEED_FAILURES) {
-      const embedding = await getEmbedding(seed.content);
-      this.failures.set(seed.id, {
-        ...seed,
-        embedding,
-        isBlinded: false,
-        reportCount: 0,
-      });
+    // 영구 JSON 파일에서 실제 사용자 사연 불러오기 (더미 시드 데이터 완전 제거)
+    try {
+      const raw = await fs.readFile(FAILURES_DATA_PATH, 'utf-8');
+      const list: Failure[] = JSON.parse(raw);
+      for (const item of list) {
+        if (!item.isSeed && !item.id.startsWith('seed-')) {
+          this.failures.set(item.id, item);
+        }
+      }
+    } catch {
+      // 파일이 없으면 깨끗한 빈 저장소로 시작
+    }
+
+    try {
+      const notesRaw = await fs.readFile(NOTES_DATA_PATH, 'utf-8');
+      this.comfortNotes = JSON.parse(notesRaw);
+    } catch {}
+  }
+
+  private async persistFailures(): Promise<void> {
+    try {
+      await fs.mkdir(path.dirname(FAILURES_DATA_PATH), { recursive: true });
+      const list = Array.from(this.failures.values()).filter((f) => !f.isSeed && !f.id.startsWith('seed-'));
+      await fs.writeFile(FAILURES_DATA_PATH, JSON.stringify(list, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Failed to persist failures:', e);
+    }
+  }
+
+  private async persistNotes(): Promise<void> {
+    try {
+      await fs.mkdir(path.dirname(NOTES_DATA_PATH), { recursive: true });
+      await fs.writeFile(NOTES_DATA_PATH, JSON.stringify(this.comfortNotes, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Failed to persist notes:', e);
     }
   }
 
@@ -150,6 +180,7 @@ class FailureStore {
     }
 
     this.failures.set(id, newFailure);
+    await this.persistFailures();
     return newFailure;
   }
 
@@ -232,6 +263,7 @@ class FailureStore {
       failure.reactions[reactionType] = (failure.reactions[reactionType] || 0) + 1;
     }
 
+    await this.persistFailures();
     return failure.reactions;
   }
 
@@ -256,6 +288,7 @@ class FailureStore {
       }
     }
 
+    await this.persistFailures();
     return { isBlinded: failure.isBlinded, reportCount: failure.reportCount };
   }
 
@@ -285,6 +318,7 @@ class FailureStore {
       createdAt: new Date().toISOString(),
     };
     this.comfortNotes.unshift(note);
+    await this.persistNotes();
     return note;
   }
 
@@ -305,6 +339,7 @@ class FailureStore {
     const failure = this.failures.get(failureId);
     if (!failure) throw new Error('Failure not found');
     failure.isOvercome = !failure.isOvercome;
+    await this.persistFailures();
     return failure;
   }
 

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Moon, Sparkles, HeartHandshake, History, Clock } from 'lucide-react';
-import { SoundscapeToggle } from './SoundscapeToggle';
 
 interface HeaderProps {
   todaysCount: number;
@@ -44,7 +43,6 @@ export function Header({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <SoundscapeToggle />
             <button
               onClick={onOpenMyFailures}
               className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all max-w-[120px] truncate"

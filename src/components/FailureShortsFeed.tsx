@@ -2,30 +2,26 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Failure, ReactionType } from '@/types';
-import { 
-  Sparkles, 
-  ChevronUp, 
-  ChevronDown, 
-  Quote, 
-  Flag, 
-  Video, 
-  Ticket, 
+import {
+  Sparkles,
+  ChevronUp,
+  ChevronDown,
+  Quote,
+  Flag,
+  Video,
+  Ticket,
   BedDouble,
-  ListFilter,
-  X,
-  Trophy,
-  Medal,
-  Award,
   Mail,
   Moon,
   Flame,
   Calendar,
   RotateCcw,
-  Volume2
+  Trophy,
+  Medal,
+  Award,
+  ArrowDown
 } from 'lucide-react';
-import { FailureCard } from './FailureCard';
 import { SendComfortNoteModal } from './SendComfortNoteModal';
-import { soundscape } from '@/lib/soundscape';
 
 interface FailureShortsFeedProps {
   similarFailures: Failure[];
@@ -39,12 +35,12 @@ interface FailureShortsFeedProps {
   onNavigateTab?: (tab: 'today' | 'lounge' | 'archive') => void;
 }
 
-interface FeedItem {
-  type: 'similar' | 'community' | 'ad' | 'closure';
-  failure?: Failure;
-  rank?: number; // 1, 2, 3 (유사 사연 순위)
-  adId?: string;
-}
+type FeedItem =
+  | { type: 'similar'; failure: Failure; rank: number }
+  | { type: 'similar_exhausted'; count: number }
+  | { type: 'ad'; adId: string }
+  | { type: 'community'; failure: Failure }
+  | { type: 'closure' };
 
 const REACTION_CONFIG: {
   type: ReactionType;
@@ -82,23 +78,22 @@ export function FailureShortsFeed({
   similarFailures,
   otherFailures,
   myTodayFailure,
-  similarCount,
   onReaction,
   onReport,
   hasPass,
   onOpenPassModal,
   onNavigateTab,
 }: FailureShortsFeedProps) {
-  // 1. 유사한 3종 사연을 최우선으로 배치!
-  const top3 = similarFailures.slice(0, 3);
+  // 1. 알고리즘 기반 피드 구성
+  const topSimilar = similarFailures.slice(0, 3);
   const others = otherFailures.filter(
-    (f) => f.id !== myTodayFailure.id && !top3.some((sf) => sf.id === f.id)
+    (f) => f.id !== myTodayFailure.id && !topSimilar.some((sf) => sf.id === f.id)
   );
 
   const items: FeedItem[] = [];
 
-  // [1단계] 유사 사연 3종 순차 등록
-  top3.forEach((failure, idx) => {
+  // [단계 1] 나와 가장 닮은 상위 사연 (최대 3편)
+  topSimilar.forEach((failure, idx) => {
     items.push({
       type: 'similar',
       failure,
@@ -106,563 +101,413 @@ export function FailureShortsFeed({
     });
   });
 
-  // [2단계] 유사 사연 3종 직후 광고 1회 자동 삽입 (패스 미보유 시)
-  if (!hasPass && top3.length > 0) {
+  // [단계 2] 유사 사연 3종 직후 광고 (패스 미보유 시)
+  if (!hasPass && topSimilar.length > 0) {
     items.push({ type: 'ad', adId: 'ad_post_top3' });
   }
 
-  // [3단계] 그 이후 일반 커뮤니티 실패 + 3개마다 광고 삽입
+  // [단계 3] 비슷한 사연 소진 알림 및 라운지/캘린더 유도 전환 카드!
+  if (topSimilar.length > 0) {
+    items.push({
+      type: 'similar_exhausted',
+      count: topSimilar.length,
+    });
+  }
+
+  // [단계 4] 모두의 커뮤니티 사연 (반영구적 세로 스크롤) + 4편마다 광고 삽입
   others.forEach((failure, idx) => {
     items.push({ type: 'community', failure });
-    if (!hasPass && (idx + 1) % 3 === 0) {
-      items.push({ type: 'ad', adId: `ad_${idx + 1}` });
+    if (!hasPass && (idx + 1) % 4 === 0) {
+      items.push({ type: 'ad', adId: `ad_community_${idx + 1}` });
     }
   });
 
-  // [4단계] 모든 사연 관람 완료 후 안식처 엔딩 카드
+  // [단계 5] 피드의 마지막: 안식처 여정 완성 엔딩 카드
   items.push({ type: 'closure' });
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [progress, setProgress] = useState(0); // 0 ~ 100
-  const [isHolding, setIsHolding] = useState(false);
-  const [isListDrawerOpen, setIsListDrawerOpen] = useState(false);
+  // 스크롤 및 현재 아이템 상태 관리
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [targetNoteFailure, setTargetNoteFailure] = useState<Failure | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [isSleeping, setIsSleeping] = useState(false);
-
-  const handleSleepMode = () => {
-    if (isSleeping) {
-      soundscape.stop();
-      setIsSleeping(false);
-    } else {
-      soundscape.play('rain');
-      setIsSleeping(true);
-    }
-  };
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const pressStartTime = useRef<number>(0);
-  const touchStartY = useRef<number | null>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const currentItem = items[currentIndex] || items[0];
-  const isAd = currentItem?.type === 'ad';
-  const durationMs = isAd ? 5000 : 7000;
+  // 스냅 스크롤 감지 (현재 화면에 보이는 카드 인덱스 감지)
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const scrollTop = container.scrollTop;
+    const itemHeight = container.clientHeight;
 
-  const goToNext = useCallback(() => {
-    setCurrentIndex((prev) => {
-      if (prev < items.length - 1) {
-        setProgress(0);
-        return prev + 1;
+    if (itemHeight > 0) {
+      const newIndex = Math.round(scrollTop / itemHeight);
+      if (newIndex >= 0 && newIndex < items.length && newIndex !== activeIndex) {
+        setActiveIndex(newIndex);
       }
-      return prev;
-    });
-  }, [items.length]);
+    }
+  }, [activeIndex, items.length]);
 
-  const goToPrev = useCallback(() => {
-    setCurrentIndex((prev) => {
-      if (prev > 0) {
-        setProgress(0);
-        return prev - 1;
-      }
-      return prev;
+  // 특정 인덱스로 스크롤 이동
+  const scrollToIndex = (index: number) => {
+    if (index < 0 || index >= items.length || !containerRef.current) return;
+    const container = containerRef.current;
+    container.scrollTo({
+      top: index * container.clientHeight,
+      behavior: 'smooth',
     });
-  }, []);
+    setActiveIndex(index);
+  };
 
-  // 인스타 스타일 프로그레스 대시바 타이머
+  // 키보드 위/아래 방향키 네비게이션
   useEffect(() => {
-    if (currentItem?.type === 'closure') {
-      setProgress(100);
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-
-    if (isHolding || isListDrawerOpen || isNoteModalOpen) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-
-    const interval = 50;
-    const step = (interval / durationMs) * 100;
-
-    timerRef.current = setInterval(() => {
-      setProgress((old) => {
-        if (old >= 100) {
-          goToNext();
-          return 0;
-        }
-        return old + step;
-      });
-    }, interval);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
+        scrollToIndex(activeIndex + 1);
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        scrollToIndex(activeIndex - 1);
+      }
     };
-  }, [isHolding, isListDrawerOpen, durationMs, goToNext]);
-
-  // 터치 및 탭 핸들러 (좌측 35% 이전, 우측 65% 다음)
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) {
-      return;
-    }
-    pressStartTime.current = Date.now();
-    touchStartY.current = e.clientY;
-    setIsHolding(true);
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    setIsHolding(false);
-    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) {
-      return;
-    }
-
-    const holdDuration = Date.now() - pressStartTime.current;
-
-    // 수직 스와이프 감지
-    if (touchStartY.current !== null) {
-      const diffY = e.clientY - touchStartY.current;
-      if (diffY < -40) {
-        goToNext();
-        return;
-      } else if (diffY > 40) {
-        goToPrev();
-        return;
-      }
-    }
-
-    // 250ms 미만 짧은 탭
-    if (holdDuration < 250 && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-
-      if (clickX < rect.width * 0.35) {
-        goToPrev();
-      } else {
-        goToNext();
-      }
-    }
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeIndex, items.length]);
 
   return (
-    <div
-      ref={containerRef}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      className="relative w-full h-full flex-1 flex flex-col justify-between overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] shadow-[0_15px_50px_rgba(0,0,0,0.8)] bg-gradient-to-b from-[#070b19] via-[#050713] to-black select-none cursor-pointer"
-    >
-      {/* 21st.dev 앰비언트 글로우 */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-72 h-72 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-
-      {/* 1. 상단 인스타 스타일 대시바 (상위 3종 사연은 특별 뱃지 색상 부여) */}
-      <div className="relative z-20 px-3.5 pt-3 space-y-1.5 flex-shrink-0">
-        <div className="flex items-center gap-1">
-          {items.slice(0, 15).map((item, idx) => {
-            const isTop3 = item.type === 'similar';
-            return (
-              <div
-                key={idx}
-                className="h-1 flex-1 bg-white/15 rounded-full overflow-hidden"
-              >
-                <div
-                  className={`h-full transition-all duration-75 ${
-                    item.type === 'ad'
-                      ? 'bg-amber-400'
-                      : item.type === 'closure'
-                      ? 'bg-gradient-to-r from-purple-400 to-emerald-400'
-                      : isTop3
-                      ? 'bg-gradient-to-r from-pink-500 to-indigo-400'
-                      : 'bg-slate-400'
-                  }`}
-                  style={{
-                    width:
-                      idx < currentIndex
-                        ? '100%'
-                        : idx === currentIndex
-                        ? `${progress}%`
-                        : '0%',
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* 대시바 아래 실시간 상태 헤더 */}
-        <div className="flex items-center justify-between pt-0.5">
-          <div className="flex items-center gap-2">
-            {isAd ? (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
-                <Video className="w-3 h-3 text-amber-400" />
-                <span>스폰서 광고 ({Math.ceil(((100 - progress) / 100) * 5)}s)</span>
-              </span>
-            ) : currentItem?.type === 'closure' ? (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-purple-300 bg-purple-950/80 border border-purple-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(168,85,247,0.3)]">
-                <Moon className="w-3 h-3 text-purple-400" />
-                <span>오늘의 안식처 완성 🌙</span>
-              </span>
-            ) : currentItem?.type === 'similar' ? (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-pink-300 bg-pink-950/80 border border-pink-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(236,72,153,0.3)]">
-                <Sparkles className="w-3 h-3 text-pink-400" />
-                <span>나와 가장 닮은 실패 {currentItem.rank}위</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-700/50 px-2.5 py-0.5 rounded-full">
-                <span>모두의 실패 피드</span>
-              </span>
-            )}
-
-            <span className="text-[10px] text-slate-500 font-mono">
-              {currentIndex + 1} / {items.length}
+    <div className="relative w-full h-full flex-1 flex flex-col min-h-0 select-none">
+      {/* 1. 상단 플로팅 상태 표시기 (유튜브 숏츠 스타일) */}
+      <div className="absolute top-2.5 left-3 right-3 z-30 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {items[activeIndex]?.type === 'similar' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-pink-300 bg-black/60 backdrop-blur-md border border-pink-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <Sparkles className="w-3 h-3 text-pink-400" />
+              <span>나와 닮은 사연 {items[activeIndex].rank}위</span>
             </span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {/* 3종 사연 한눈에 보기 버튼 */}
-            {top3.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsListDrawerOpen(true);
-                }}
-                className="text-[10px] text-pink-300 hover:text-pink-200 flex items-center gap-1 bg-pink-950/40 border border-pink-700/40 px-2 py-0.5 rounded-full transition-colors"
-                title="유사 사연 3종 한눈에 모아보기"
-              >
-                <ListFilter className="w-3 h-3" />
-                <span>3종 모아보기</span>
-              </button>
-            )}
-
-            {isHolding && (
-              <span className="text-[10px] text-amber-300 font-medium bg-amber-950/60 border border-amber-700/50 px-2 py-0.5 rounded-full animate-pulse">
-                일시정지
-              </span>
-            )}
-          </div>
+          ) : items[activeIndex]?.type === 'similar_exhausted' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/60 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <Flame className="w-3 h-3 text-amber-400" />
+              <span>닮은 사연 완독</span>
+            </span>
+          ) : items[activeIndex]?.type === 'ad' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/60 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <Video className="w-3 h-3 text-amber-400" />
+              <span>스폰서 꿀잠 쉼터</span>
+            </span>
+          ) : items[activeIndex]?.type === 'closure' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-purple-300 bg-black/60 backdrop-blur-md border border-purple-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <Moon className="w-3 h-3 text-purple-400" />
+              <span>오늘의 안식처 완성</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-black/60 backdrop-blur-md border border-indigo-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <span>모두의 실패 숏츠</span>
+            </span>
+          )}
         </div>
+
+        {/* 현재 인덱스 카운터 */}
+        <span className="text-[11px] text-slate-300 font-mono bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 shadow-sm pointer-events-auto">
+          {activeIndex + 1} / {items.length}
+        </span>
       </div>
 
-      {/* 2. 중앙 메인 콘텐츠: [안식처 여정 완료] or [유사 사연 1~3위] or [광고] or [일반 사연] */}
-      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-4 sm:px-6 py-2 overflow-hidden">
-        {currentItem?.type === 'closure' ? (
-          /* [안식처 여정 완료 엔딩 카드] */
-          <div className="w-full flex flex-col justify-between h-full py-2 sm:py-3 px-1 text-center animate-in zoom-in-95 duration-300">
-            <div className="my-auto space-y-3 sm:space-y-4">
-              {/* 반짝이는 달빛 아우라 아이콘 */}
-              <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 blur-xl opacity-60 animate-pulse" />
-                <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 border border-white/20 flex items-center justify-center text-white shadow-[0_0_30px_rgba(168,85,247,0.5)]">
-                  <Moon className="w-7 h-7 sm:w-8 sm:h-8 fill-white/20 text-white" />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <span className="inline-flex items-center gap-1.5 bg-purple-950/80 border border-purple-500/40 px-3 py-1 rounded-full text-[11px] font-bold text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.25)]">
-                  <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-                  <span>오늘의 안식처 여정 완료</span>
-                </span>
-                <h2 className="text-lg sm:text-xl font-black text-slate-100 tracking-tight leading-snug">
-                  오늘 하루도<br />참 고생 많으셨어요
-                </h2>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                  오늘 털어놓은 당신의 실패는 부끄러운 상처가 아닌,<br />
-                  내일의 당신을 더 단단하게 만들어 줄 디딤돌입니다.<br />
-                  어둠 속에서도 함께 걷는 이웃들이 곁에 있어요.
-                </p>
-              </div>
-
-              {/* 오늘의 나눔 요약 칩 */}
-              <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto pt-1">
-                <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-2.5">
-                  <span className="text-[10px] text-slate-500 block">함께 나눈 사연</span>
-                  <span className="text-xs sm:text-sm font-black text-indigo-300">{top3.length + others.length}편 완독 📚</span>
-                </div>
-                <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-2.5">
-                  <span className="text-[10px] text-slate-500 block">나와 닮은 최고 공감</span>
-                  <span className="text-xs sm:text-sm font-black text-pink-300">
-                    {top3[0]?.similarityScore || 89}% 일치 💖
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 3가지 감성 액션 버튼 */}
-            <div className="space-y-2 pt-2 relative z-20 w-full max-w-xs mx-auto flex-shrink-0">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNavigateTab?.('lounge');
-                }}
-                className="w-full py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-gradient-to-r from-amber-500 via-orange-500 to-pink-600 text-white shadow-[0_0_25px_rgba(245,158,11,0.4)] hover:opacity-95"
-              >
-                <Flame className="w-4 h-4 text-amber-200 fill-amber-200/30 animate-pulse" />
-                <span>🕯️ 이웃들이 깨어있는 심야 라운지 가기</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNavigateTab?.('archive');
-                }}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-white/[0.06] hover:bg-white/[0.1] text-slate-200 border border-white/[0.1] flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-              >
-                <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                <span>내 달빛 캘린더 & 보관함 가기</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentIndex(0);
-                  setProgress(0);
-                }}
-                className="w-full py-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-300 flex items-center justify-center gap-1 transition-colors"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>처음 사연부터 다시 둘러보기</span>
-              </button>
-            </div>
-          </div>
-        ) : isAd ? (
-          /* [자동 삽입된 숏츠 광고 카드] */
-          <div className="w-full glass-card rounded-2xl sm:rounded-3xl p-5 sm:p-6 border border-amber-500/30 text-center space-y-3 shadow-[0_0_40px_rgba(245,158,11,0.2)] animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mx-auto shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-              <BedDouble className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                Sponsored · 꿀잠 테라피
-              </span>
-              <h3 className="text-sm sm:text-base font-black text-slate-100 leading-snug">
-                “오늘 실패는 잊고 푹 주무세요”<br />
-                마음을 편안하게 해주는 꿀잠 필로우
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                유사 실패 3종을 모두 확인하셨습니다. 편안한 밤 되세요.
-              </p>
-            </div>
-
-            {/* 이용권 구매 팝업 버튼 */}
-            <div className="pt-1 space-y-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenPassModal();
-                }}
-                className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 via-pink-500 to-indigo-500 hover:opacity-95 active:scale-[0.98] shadow-[0_0_25px_rgba(245,158,11,0.35)] animate-shimmer flex items-center justify-center gap-2"
-              >
-                <Ticket className="w-4 h-4 text-white" />
-                <span>🎟️ 광고 없이 무제한으로 보기 (이용권 구매)</span>
-              </button>
-
-              <div className="text-[10px] text-slate-500 font-mono">
-                {Math.ceil(((100 - progress) / 100) * 5)}초 후 자동으로 다음 이야기로 넘어갑니다
-              </div>
-            </div>
-          </div>
-        ) : currentItem?.failure ? (
-          /* [실제 실패 숏폼 카드] */
-          <div className="w-full flex flex-col justify-between h-full py-1">
-            {/* 상단 순위 및 카테고리 태그 */}
-            <div className="flex items-center justify-between gap-2 flex-shrink-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {/* 1, 2, 3위 유사 사연인 경우 눈에 띄는 랭킹 배지 노출 */}
-                {currentItem.rank ? (
-                  <span className="text-[10px] sm:text-[11px] font-black text-white bg-gradient-to-r from-pink-500 to-purple-600 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(236,72,153,0.4)] flex items-center gap-1">
-                    {currentItem.rank === 1 && <Trophy className="w-3 h-3 text-amber-300" />}
-                    {currentItem.rank === 2 && <Medal className="w-3 h-3 text-slate-300" />}
-                    {currentItem.rank === 3 && <Award className="w-3 h-3 text-amber-500" />}
-                    <span>유사 실패 {currentItem.rank}위</span>
-                  </span>
-                ) : null}
-
-                <span className="text-[10px] sm:text-[11px] font-semibold text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-0.5 rounded-full">
-                  #{currentItem.failure.category}
-                </span>
-
-                {currentItem.failure.similarityScore !== undefined && (
-                  <span className="text-[9px] sm:text-[10px] font-bold text-pink-300 bg-pink-500/15 border border-pink-500/30 px-2 py-0.5 rounded-full">
-                    나와의 공감도 {currentItem.failure.similarityScore}%
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                <span className="truncate max-w-[90px]">{currentItem.failure.authorNickname || '익명의 친구'}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (currentItem.failure) onReport(currentItem.failure.id);
-                  }}
-                  className="p-1 text-slate-600 hover:text-rose-400 transition-colors"
-                  title="신고"
-                >
-                  <Flag className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* 중앙 본문 사연 */}
-            <div className="my-auto py-2 sm:py-3 space-y-2.5 max-h-[60vh] overflow-y-auto pr-9">
-              <p className="text-sm sm:text-base font-medium text-slate-100 leading-relaxed break-words whitespace-pre-wrap">
-                &ldquo;{currentItem.failure.content}&rdquo;
-              </p>
-
-              {/* AI 위로 한마디 */}
-              {currentItem.failure.aiComfortQuote && (
-                <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/40 flex items-start gap-2 text-xs text-indigo-200 italic shadow-inner">
-                  <Quote className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 rotate-180" />
-                  <span>{currentItem.failure.aiComfortQuote}</span>
-                </div>
-              )}
-            </div>
-
-            {/* 하단 힌트 */}
-            <div className="text-center flex-shrink-0">
-              <span className="text-[10px] text-slate-500">
-                {currentItem.rank && currentItem.rank < 3
-                  ? `화면 우측 터치 시 ${currentItem.rank + 1}위 유사 사연으로 이동`
-                  : '화면 우측 터치 시 다음 이야기로 이동'}
-              </span>
-            </div>
-          </div>
-        ) : null}
-
-        {/* 3. 우측 세로 숏츠형 인터랙션 플로팅 바 */}
-        {!isAd && currentItem?.failure && (
-          <div className="absolute right-2.5 bottom-4 flex flex-col items-center gap-2 z-20">
-            {REACTION_CONFIG.map(({ type, emoji, label, activeClass }) => {
-              const count = currentItem.failure?.reactions[type] || 0;
-              const isSelected = currentItem.failure?.userReactions?.includes(type);
-
-              return (
-                <button
-                  key={type}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (currentItem.failure) onReaction(currentItem.failure.id, type);
-                  }}
-                  className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center transition-all active:scale-90 border backdrop-blur-md ${
-                    isSelected
-                      ? activeClass
-                      : 'bg-black/50 text-slate-300 border-white/[0.1] hover:bg-white/[0.1]'
-                  }`}
-                  title={label}
-                >
-                  <span className="text-sm leading-none">{emoji}</span>
-                  <span className="text-[9px] font-bold font-mono mt-0.5">
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-
-            {/* 💌 1초 익명 온기 쪽지 보내기 버튼 */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsNoteModalOpen(true);
+      {/* 2. 메인 유튜브 숏츠형 세로 스냅 피드 컨테이너 */}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="w-full h-full flex-1 overflow-y-scroll snap-y snap-mandatory no-scrollbar rounded-2xl sm:rounded-3xl border border-white/[0.08] shadow-[0_15px_50px_rgba(0,0,0,0.8)] bg-gradient-to-b from-[#070b19] via-[#050713] to-black"
+        style={{ scrollBehavior: 'smooth' }}
+      >
+        {items.map((item, idx) => {
+          return (
+            <div
+              key={idx}
+              ref={(el) => {
+                cardRefs.current[idx] = el;
               }}
-              className="w-10 h-10 rounded-xl flex flex-col items-center justify-center transition-all active:scale-90 border backdrop-blur-md bg-pink-950/70 text-pink-300 border-pink-500/40 hover:bg-pink-900/60 shadow-[0_0_12px_rgba(236,72,153,0.3)]"
-              title="1초 익명 온기 쪽지 보내기"
+              className="w-full h-full snap-start snap-always flex-shrink-0 flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden"
             >
-              <Mail className="w-4 h-4 text-pink-400" />
-              <span className="text-[8px] font-bold mt-0.5">온기</span>
-            </button>
-          </div>
-        )}
-      </div>
+              {/* 앰비언트 글로우 배경 효과 */}
+              <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* 4. 하단 네비게이션 컨트롤 */}
-      <div className="relative z-20 px-3 pb-2 flex items-center justify-between text-xs text-slate-500 border-t border-white/[0.05] pt-1.5 flex-shrink-0">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            goToPrev();
-          }}
-          disabled={currentIndex === 0}
-          className="flex items-center gap-0.5 text-[10px] hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none py-1 px-1.5 rounded-lg"
-        >
-          <ChevronUp className="w-3.5 h-3.5" />
-          <span>이전</span>
-        </button>
+              {/* [카드 타입 A: 실패 사연 숏츠 (유사 사연 또는 커뮤니티)] */}
+              {item.type === 'similar' || item.type === 'community' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 relative z-10">
+                  {/* 상단 태그 및 작성자 정보 */}
+                  <div className="flex items-center justify-between gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.type === 'similar' && (
+                        <span className="text-[11px] font-black text-white bg-gradient-to-r from-pink-500 to-purple-600 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(236,72,153,0.4)] flex items-center gap-1">
+                          {item.rank === 1 && <Trophy className="w-3 h-3 text-amber-300" />}
+                          {item.rank === 2 && <Medal className="w-3 h-3 text-slate-300" />}
+                          {item.rank === 3 && <Award className="w-3 h-3 text-amber-500" />}
+                          <span>유사 실패 {item.rank}위</span>
+                        </span>
+                      )}
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenPassModal();
-          }}
-          className="text-[10px] text-amber-300 hover:text-amber-200 flex items-center gap-1 bg-amber-950/50 border border-amber-700/40 px-2 py-0.5 rounded-full"
-        >
-          <Ticket className="w-3 h-3" />
-          <span>{hasPass ? '프리미엄' : '이용권'}</span>
-        </button>
+                      <span className="text-[11px] font-semibold text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-0.5 rounded-full">
+                        #{item.failure.category}
+                      </span>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            goToNext();
-          }}
-          disabled={currentIndex >= items.length - 1}
-          className="flex items-center gap-0.5 text-[10px] text-indigo-400 hover:text-indigo-300 disabled:opacity-30 disabled:pointer-events-none py-1 px-1.5 rounded-lg font-bold"
-        >
-          <span>다음</span>
-          <ChevronDown className="w-3.5 h-3.5" />
-        </button>
-      </div>
+                      {item.failure.similarityScore !== undefined && (
+                        <span className="text-[10px] font-bold text-pink-300 bg-pink-500/15 border border-pink-500/30 px-2 py-0.5 rounded-full">
+                          나와의 공감도 {item.failure.similarityScore}%
+                        </span>
+                      )}
+                    </div>
 
-      {/* 5. [유사 사연 3종 한눈에 모아보기] 바텀 시트 드로어 */}
-      {isListDrawerOpen && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col justify-between p-4 animate-in fade-in duration-200"
-        >
-          <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-pink-400" />
-              <h3 className="text-sm font-bold text-slate-100">
-                오늘 나와 가장 닮은 실패 3종
-              </h3>
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                      <span className="truncate max-w-[90px]">{item.failure.authorNickname || '익명의 친구'}</span>
+                      <button
+                        onClick={() => onReport(item.failure.id)}
+                        className="p-1 text-slate-600 hover:text-rose-400 transition-colors"
+                        title="신고"
+                      >
+                        <Flag className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 중앙 본문 사연 및 AI 위로 한마디 */}
+                  <div className="my-auto py-3 space-y-3 pr-14 max-h-[55vh] overflow-y-auto">
+                    <p className="text-base sm:text-lg font-medium text-slate-100 leading-relaxed break-words whitespace-pre-wrap">
+                      &ldquo;{item.failure.content}&rdquo;
+                    </p>
+
+                    {item.failure.aiComfortQuote && (
+                      <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/40 flex items-start gap-2 text-xs text-indigo-200 italic shadow-inner">
+                        <Quote className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 rotate-180" />
+                        <span>{item.failure.aiComfortQuote}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 우측 세로 숏츠형 인터랙션 플로팅 바 */}
+                  <div className="absolute right-1 bottom-10 flex flex-col items-center gap-2.5 z-20">
+                    {REACTION_CONFIG.map(({ type, emoji, label, activeClass }) => {
+                      const count = item.failure.reactions[type] || 0;
+                      const isSelected = item.failure.userReactions?.includes(type);
+
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => onReaction(item.failure.id, type)}
+                          className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center transition-all active:scale-90 border backdrop-blur-md ${
+                            isSelected
+                              ? activeClass
+                              : 'bg-black/50 text-slate-300 border-white/[0.1] hover:bg-white/[0.1]'
+                          }`}
+                          title={label}
+                        >
+                          <span className="text-sm leading-none">{emoji}</span>
+                          <span className="text-[9px] font-bold font-mono mt-0.5">
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+
+                    {/* 💌 1초 익명 온기 쪽지 보내기 */}
+                    <button
+                      onClick={() => {
+                        setTargetNoteFailure(item.failure);
+                        setIsNoteModalOpen(true);
+                      }}
+                      className="w-10 h-10 rounded-xl flex flex-col items-center justify-center transition-all active:scale-90 border backdrop-blur-md bg-pink-950/70 text-pink-300 border-pink-500/40 hover:bg-pink-900/60 shadow-[0_0_12px_rgba(236,72,153,0.3)]"
+                      title="1초 익명 온기 쪽지 보내기"
+                    >
+                      <Mail className="w-4 h-4 text-pink-400" />
+                      <span className="text-[8px] font-bold mt-0.5">온기</span>
+                    </button>
+                  </div>
+
+                  {/* 하단 스와이프 안내 */}
+                  <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
+                    <span>아래로 스와이프하여 다음 사연 보기</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* [카드 타입 B: 비슷한 사연 소진 알림 & 라운지/캘린더 유도 전환 카드] */}
+              {item.type === 'similar_exhausted' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                  <div className="my-auto space-y-4 max-w-sm mx-auto">
+                    <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-pink-500 blur-xl opacity-60 animate-pulse" />
+                      <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-950 to-amber-900 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.3)]">
+                        <Flame className="w-7 h-7 fill-amber-400/30" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-amber-300 bg-amber-950/70 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
+                        유사한 실패 {item.count}편 완독
+                      </span>
+                      <h3 className="text-base sm:text-lg font-black text-slate-100 leading-snug">
+                        나와 가장 닮은 사연을<br />모두 만났어요
+                      </h3>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        나와 비슷한 상처를 안고 있는 이웃들과 함께<br />
+                        심야 라운지에서 온기 촛불을 밝혀보세요.<br />
+                        또는 아래로 계속 넘겨 이웃들의 모든 사연을 둘러보실 수 있습니다.
+                      </p>
+                    </div>
+
+                    {/* 유도 액션 버튼 2개 */}
+                    <div className="space-y-2 pt-1">
+                      <button
+                        onClick={() => onNavigateTab?.('lounge')}
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 via-orange-500 to-pink-600 text-white shadow-[0_0_20px_rgba(245,158,11,0.35)] flex items-center justify-center gap-2 active:scale-98 transition-all"
+                      >
+                        <Flame className="w-3.5 h-3.5 fill-white/20" />
+                        <span>🕯️ 심야 라운지에서 온기 나누기</span>
+                      </button>
+
+                      <button
+                        onClick={() => onNavigateTab?.('archive')}
+                        className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-white/[0.05] hover:bg-white/[0.08] text-slate-300 border border-white/[0.08] flex items-center justify-center gap-2 active:scale-98 transition-all"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>내 달빛 캘린더 & 보관함 보기</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 하단 스와이프 유도 */}
+                  <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
+                    <span>이웃들의 모든 사연 계속 보기</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* [카드 타입 C: 스폰서 광고 및 프리미엄 결제 유도] */}
+              {item.type === 'ad' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                  <div className="my-auto space-y-4 max-w-sm mx-auto glass-card p-6 rounded-3xl border border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mx-auto shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                      <BedDouble className="w-6 h-6" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        Sponsored · 꿀잠 쉼터
+                      </span>
+                      <h3 className="text-sm sm:text-base font-black text-slate-100 leading-snug">
+                        “오늘 실패는 잊고 푹 주무세요”<br />
+                        마음을 편안하게 해주는 심야 테라피
+                      </h3>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        실패를 털어놓은 당신은 이미 충분히 훌륭합니다.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={onOpenPassModal}
+                      className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 via-pink-500 to-indigo-500 hover:opacity-95 active:scale-[0.98] shadow-[0_0_25px_rgba(245,158,11,0.35)] animate-shimmer flex items-center justify-center gap-2"
+                    >
+                      <Ticket className="w-4 h-4 text-white" />
+                      <span>🎟️ 광고 없이 무제한으로 보기 (이용권)</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
+                    <span>아래로 스와이프하여 다음 이야기 보기</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* [카드 타입 D: 오늘의 안식처 완성 엔딩 카드] */}
+              {item.type === 'closure' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                  <div className="my-auto space-y-4 max-w-sm mx-auto">
+                    <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 blur-xl opacity-60 animate-pulse" />
+                      <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 border border-white/20 flex items-center justify-center text-white shadow-[0_0_30px_rgba(168,85,247,0.5)]">
+                        <Moon className="w-7 h-7 fill-white/20 text-white" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="inline-flex items-center gap-1.5 bg-purple-950/80 border border-purple-500/40 px-3 py-1 rounded-full text-[11px] font-bold text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.25)]">
+                        <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                        <span>오늘의 안식처 여정 완료</span>
+                      </span>
+                      <h2 className="text-lg sm:text-xl font-black text-slate-100 tracking-tight leading-snug">
+                        오늘 하루도<br />참 고생 많으셨어요
+                      </h2>
+                      <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                        오늘 털어놓은 당신의 실패는 부끄러운 상처가 아닌,<br />
+                        내일의 당신을 더 단단하게 만들어 줄 디딤돌입니다.<br />
+                        어둠 속에서도 함께 걷는 이웃들이 곁에 있어요.
+                      </p>
+                    </div>
+
+                    {/* 액션 버튼 */}
+                    <div className="space-y-2 pt-2 w-full max-w-xs mx-auto">
+                      <button
+                        onClick={() => onNavigateTab?.('lounge')}
+                        className="w-full py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-gradient-to-r from-amber-500 via-orange-500 to-pink-600 text-white shadow-[0_0_25px_rgba(245,158,11,0.4)] hover:opacity-95"
+                      >
+                        <Flame className="w-4 h-4 text-amber-200 fill-amber-200/30 animate-pulse" />
+                        <span>🕯️ 이웃들이 깨어있는 심야 라운지 가기</span>
+                      </button>
+
+                      <button
+                        onClick={() => onNavigateTab?.('archive')}
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-white/[0.06] hover:bg-white/[0.1] text-slate-200 border border-white/[0.1] flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                        <span>내 달빛 캘린더 & 보관함 가기</span>
+                      </button>
+
+                      <button
+                        onClick={() => scrollToIndex(0)}
+                        className="w-full py-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-300 flex items-center justify-center gap-1 transition-colors"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>맨 처음 사연으로 다시 올라가기</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
-            <button
-              onClick={() => setIsListDrawerOpen(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          );
+        })}
+      </div>
 
-          <div className="flex-1 overflow-y-auto py-3 space-y-3">
-            {top3.map((failure, idx) => (
-              <div key={failure.id} className="space-y-1">
-                <span className="text-[10px] font-black text-pink-400 bg-pink-950/60 border border-pink-500/30 px-2 py-0.5 rounded-full">
-                  {idx + 1}위 유사 사연 (공감도 {failure.similarityScore || 75}%)
-                </span>
-                <FailureCard
-                  failure={failure}
-                  onReaction={onReaction}
-                  onReport={onReport}
-                />
-              </div>
-            ))}
-          </div>
+      {/* 3. 우측 데스크톱/터치 네비게이션 화살표 */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 z-30 pointer-events-auto">
+        <button
+          onClick={() => scrollToIndex(activeIndex - 1)}
+          disabled={activeIndex === 0}
+          className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white disabled:opacity-20 flex items-center justify-center transition-all active:scale-90"
+          title="이전 이야기 (위로)"
+        >
+          <ChevronUp className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => scrollToIndex(activeIndex + 1)}
+          disabled={activeIndex >= items.length - 1}
+          className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white disabled:opacity-20 flex items-center justify-center transition-all active:scale-90"
+          title="다음 이야기 (아래로)"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      </div>
 
-          <button
-            onClick={() => setIsListDrawerOpen(false)}
-            className="w-full py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-500 flex-shrink-0"
-          >
-            숏폼 스토리로 계속 보기
-          </button>
-        </div>
-      )}
-
-      {/* 6. [1초 익명 온기 쪽지 보내기] 모달 */}
+      {/* 4. 1초 익명 온기 쪽지 보내기 모달 */}
       <SendComfortNoteModal
-        failure={currentItem?.failure || null}
+        failure={targetNoteFailure}
         isOpen={isNoteModalOpen}
-        onClose={() => setIsNoteModalOpen(false)}
+        onClose={() => {
+          setIsNoteModalOpen(false);
+          setTargetNoteFailure(null);
+        }}
       />
     </div>
   );
