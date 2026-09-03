@@ -19,20 +19,22 @@ import {
   Trophy,
   Medal,
   Award,
-  ArrowDown
+  ArrowDown,
+  PenLine
 } from 'lucide-react';
 import { SendComfortNoteModal } from './SendComfortNoteModal';
 
 interface FailureShortsFeedProps {
   similarFailures: Failure[];
   otherFailures: Failure[];
-  myTodayFailure: Failure;
+  myTodayFailure: Failure | null;
   similarCount: number;
   onReaction: (failureId: string, type: ReactionType) => void;
   onReport: (failureId: string) => void;
   hasPass: boolean;
   onOpenPassModal: () => void;
   onNavigateTab?: (tab: 'today' | 'lounge' | 'archive') => void;
+  onOpenWriteGate?: () => void;
 }
 
 type FeedItem =
@@ -40,7 +42,8 @@ type FeedItem =
   | { type: 'similar_exhausted'; count: number }
   | { type: 'ad'; adId: string }
   | { type: 'community'; failure: Failure }
-  | { type: 'closure' };
+  | { type: 'closure' }
+  | { type: 'empty' };
 
 const REACTION_CONFIG: {
   type: ReactionType;
@@ -83,47 +86,52 @@ export function FailureShortsFeed({
   hasPass,
   onOpenPassModal,
   onNavigateTab,
+  onOpenWriteGate,
 }: FailureShortsFeedProps) {
   // 1. 알고리즘 기반 피드 구성
   const topSimilar = similarFailures.slice(0, 3);
   const others = otherFailures.filter(
-    (f) => f.id !== myTodayFailure.id && !topSimilar.some((sf) => sf.id === f.id)
+    (f) => (!myTodayFailure || f.id !== myTodayFailure.id) && !topSimilar.some((sf) => sf.id === f.id)
   );
 
   const items: FeedItem[] = [];
 
-  // [단계 1] 나와 가장 닮은 상위 사연 (최대 3편)
-  topSimilar.forEach((failure, idx) => {
-    items.push({
-      type: 'similar',
-      failure,
-      rank: idx + 1,
+  if (topSimilar.length === 0 && others.length === 0) {
+    items.push({ type: 'empty' });
+  } else {
+    // [단계 1] 나와 가장 닮은 상위 사연 (최대 3편)
+    topSimilar.forEach((failure, idx) => {
+      items.push({
+        type: 'similar',
+        failure,
+        rank: idx + 1,
+      });
     });
-  });
 
-  // [단계 2] 유사 사연 3종 직후 광고 (패스 미보유 시)
-  if (!hasPass && topSimilar.length > 0) {
-    items.push({ type: 'ad', adId: 'ad_post_top3' });
-  }
-
-  // [단계 3] 비슷한 사연 소진 알림 및 라운지/캘린더 유도 전환 카드!
-  if (topSimilar.length > 0) {
-    items.push({
-      type: 'similar_exhausted',
-      count: topSimilar.length,
-    });
-  }
-
-  // [단계 4] 모두의 커뮤니티 사연 (반영구적 세로 스크롤) + 4편마다 광고 삽입
-  others.forEach((failure, idx) => {
-    items.push({ type: 'community', failure });
-    if (!hasPass && (idx + 1) % 4 === 0) {
-      items.push({ type: 'ad', adId: `ad_community_${idx + 1}` });
+    // [단계 2] 유사 사연 3종 직후 광고 (패스 미보유 시)
+    if (!hasPass && topSimilar.length > 0) {
+      items.push({ type: 'ad', adId: 'ad_post_top3' });
     }
-  });
 
-  // [단계 5] 피드의 마지막: 안식처 여정 완성 엔딩 카드
-  items.push({ type: 'closure' });
+    // [단계 3] 비슷한 사연 소진 알림 및 라운지/캘린더 유도 전환 카드!
+    if (topSimilar.length > 0) {
+      items.push({
+        type: 'similar_exhausted',
+        count: topSimilar.length,
+      });
+    }
+
+    // [단계 4] 모두의 커뮤니티 사연 (반영구적 세로 스크롤) + 4편마다 광고 삽입
+    others.forEach((failure, idx) => {
+      items.push({ type: 'community', failure });
+      if (!hasPass && (idx + 1) % 4 === 0) {
+        items.push({ type: 'ad', adId: `ad_community_${idx + 1}` });
+      }
+    });
+
+    // [단계 5] 피드의 마지막: 안식처 여정 완성 엔딩 카드
+    items.push({ type: 'closure' });
+  }
 
   // 스크롤 및 현재 아이템 상태 관리
   const [activeIndex, setActiveIndex] = useState(0);
@@ -177,37 +185,53 @@ export function FailureShortsFeed({
   return (
     <div className="relative w-full h-full flex-1 flex flex-col min-h-0 select-none">
       {/* 1. 상단 플로팅 상태 표시기 (유튜브 숏츠 스타일) */}
-      <div className="absolute top-2.5 left-3 right-3 z-30 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
+      <div className="absolute top-2 left-2.5 right-2.5 z-30 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-1.5 pointer-events-auto">
           {items[activeIndex]?.type === 'similar' ? (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-pink-300 bg-black/60 backdrop-blur-md border border-pink-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-pink-300 bg-black/70 backdrop-blur-md border border-pink-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
               <Sparkles className="w-3 h-3 text-pink-400" />
               <span>나와 닮은 사연 {items[activeIndex].rank}위</span>
             </span>
           ) : items[activeIndex]?.type === 'similar_exhausted' ? (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/60 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/70 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
               <Flame className="w-3 h-3 text-amber-400" />
               <span>닮은 사연 완독</span>
             </span>
           ) : items[activeIndex]?.type === 'ad' ? (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/60 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/70 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
               <Video className="w-3 h-3 text-amber-400" />
               <span>스폰서 꿀잠 쉼터</span>
             </span>
           ) : items[activeIndex]?.type === 'closure' ? (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-purple-300 bg-black/60 backdrop-blur-md border border-purple-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-purple-300 bg-black/70 backdrop-blur-md border border-purple-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
               <Moon className="w-3 h-3 text-purple-400" />
               <span>오늘의 안식처 완성</span>
             </span>
+          ) : items[activeIndex]?.type === 'empty' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-black/70 backdrop-blur-md border border-indigo-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+              <Moon className="w-3 h-3 text-indigo-400" />
+              <span>첫 번째 안식처</span>
+            </span>
           ) : (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-black/60 backdrop-blur-md border border-indigo-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-black/70 backdrop-blur-md border border-indigo-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
               <span>모두의 실패 숏츠</span>
             </span>
+          )}
+
+          {/* 아직 쓰지 않고 둘러보는 유저를 위한 글쓰기 버튼 */}
+          {!myTodayFailure && onOpenWriteGate && (
+            <button
+              onClick={onOpenWriteGate}
+              className="pointer-events-auto flex items-center gap-1 text-[10px] font-bold text-white bg-gradient-to-r from-indigo-600 to-pink-600 px-2.5 py-0.5 rounded-full shadow-lg active:scale-95 transition-all"
+            >
+              <PenLine className="w-3 h-3" />
+              <span>나도 털어놓기</span>
+            </button>
           )}
         </div>
 
         {/* 현재 인덱스 카운터 */}
-        <span className="text-[11px] text-slate-300 font-mono bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 shadow-sm pointer-events-auto">
+        <span className="text-[10px] text-slate-300 font-mono bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 shadow-sm pointer-events-auto">
           {activeIndex + 1} / {items.length}
         </span>
       </div>
@@ -470,6 +494,49 @@ export function FailureShortsFeed({
                       >
                         <RotateCcw className="w-3 h-3" />
                         <span>맨 처음 사연으로 다시 올라가기</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* [카드 타입 E: 사연이 아직 없을 때 안심 안내 카드] */}
+              {item.type === 'empty' ? (
+                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                  <div className="my-auto space-y-4 max-w-sm mx-auto">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-950 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mx-auto shadow-[0_0_25px_rgba(99,102,241,0.3)]">
+                      <Moon className="w-8 h-8 fill-white/10" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-500/30 px-2.5 py-0.5 rounded-full">
+                        첫 번째 안식처의 밤
+                      </span>
+                      <h3 className="text-base sm:text-lg font-black text-slate-100">
+                        오늘 첫 번째 실패의<br />주인공이 되어보세요
+                      </h3>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        아직 오늘 등록된 다른 이웃의 실패가 없습니다.<br />
+                        당신의 솔직한 이야기가 곧 찾아올 이웃들에게<br />
+                        가장 따뜻한 위로와 용기가 됩니다.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      {onOpenWriteGate && (
+                        <button
+                          onClick={onOpenWriteGate}
+                          className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg flex items-center justify-center gap-2 active:scale-98"
+                        >
+                          <PenLine className="w-3.5 h-3.5" />
+                          <span>오늘의 실패 털어놓기</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onNavigateTab?.('lounge')}
+                        className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-white/[0.05] text-slate-300 border border-white/[0.08] flex items-center justify-center gap-2"
+                      >
+                        <Flame className="w-3.5 h-3.5 text-amber-400" />
+                        <span>심야 라운지 둘러보기</span>
                       </button>
                     </div>
                   </div>

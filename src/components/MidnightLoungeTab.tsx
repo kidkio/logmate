@@ -155,7 +155,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   };
 
   return (
-    <div className="w-full h-full flex-1 flex flex-col justify-between overflow-y-auto space-y-4 px-1 pb-4 text-slate-100 select-none">
+    <div className="w-full h-full flex-1 overflow-y-auto space-y-4 px-1 pb-28 pt-1 text-slate-100 select-none no-scrollbar">
       {/* 1. 상단 라이브 상태 배너 */}
       <div className="glass-card rounded-2xl p-3.5 sm:p-4 border border-indigo-500/20 shadow-[0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-between">
         <div className="space-y-0.5">

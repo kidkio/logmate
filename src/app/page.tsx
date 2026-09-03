@@ -36,6 +36,7 @@ function MainApp() {
   // 무제한 이용권 보유 여부
   const [hasPass, setHasPass] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+  const [isBrowsingShorts, setIsBrowsingShorts] = useState(false);
 
   // 모달 상태
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -289,14 +290,15 @@ function MainApp() {
         <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col px-3 sm:px-4 py-2">
           {activeTab === 'today' && (
             <div className="w-full h-full flex-1 min-h-0 flex flex-col">
-              {!myTodayFailure ? (
-                /* 아직 작성하지 않았으면: 털어놓기 게이트 먼저 표시 */
+              {!myTodayFailure && !isBrowsingShorts ? (
+                /* 아직 작성하지 않았고 숏츠 둘러보기를 누르지 않았으면: 털어놓기 게이트 표시 */
                 <DailyRitualGate
                   onSuccess={handleSuccessCreate}
                   onExploreAnyway={() => setActiveTab('lounge')}
+                  onBrowseShorts={() => setIsBrowsingShorts(true)}
                 />
               ) : (
-                /* 작성 완료 시: 유사한 3종 사연이 1~3위로 최우선 노출되는 숏츠 뷰 */
+                /* 작성 완료 또는 숏츠 둘러보기 시: 숏츠 뷰 */
                 <FailureShortsFeed
                   similarFailures={todaySimilarFailures}
                   otherFailures={failures}
@@ -307,6 +309,7 @@ function MainApp() {
                   hasPass={hasPass}
                   onOpenPassModal={() => setIsPassModalOpen(true)}
                   onNavigateTab={(tab) => setActiveTab(tab)}
+                  onOpenWriteGate={() => setIsBrowsingShorts(false)}
                 />
               )}
             </div>
