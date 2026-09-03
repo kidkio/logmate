@@ -15,9 +15,11 @@ import {
   X,
   Trophy,
   Medal,
-  Award
+  Award,
+  Mail
 } from 'lucide-react';
 import { FailureCard } from './FailureCard';
+import { SendComfortNoteModal } from './SendComfortNoteModal';
 
 interface FailureShortsFeedProps {
   similarFailures: Failure[];
@@ -113,6 +115,7 @@ export function FailureShortsFeed({
   const [progress, setProgress] = useState(0); // 0 ~ 100
   const [isHolding, setIsHolding] = useState(false);
   const [isListDrawerOpen, setIsListDrawerOpen] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -145,7 +148,7 @@ export function FailureShortsFeed({
 
   // 인스타 스타일 프로그레스 대시바 타이머
   useEffect(() => {
-    if (isHolding || isListDrawerOpen) {
+    if (isHolding || isListDrawerOpen || isNoteModalOpen) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -438,6 +441,19 @@ export function FailureShortsFeed({
                 </button>
               );
             })}
+
+            {/* 💌 1초 익명 온기 쪽지 보내기 버튼 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsNoteModalOpen(true);
+              }}
+              className="w-10 h-10 rounded-xl flex flex-col items-center justify-center transition-all active:scale-90 border backdrop-blur-md bg-pink-950/70 text-pink-300 border-pink-500/40 hover:bg-pink-900/60 shadow-[0_0_12px_rgba(236,72,153,0.3)]"
+              title="1초 익명 온기 쪽지 보내기"
+            >
+              <Mail className="w-4 h-4 text-pink-400" />
+              <span className="text-[8px] font-bold mt-0.5">온기</span>
+            </button>
           </div>
         )}
       </div>
@@ -524,6 +540,13 @@ export function FailureShortsFeed({
           </button>
         </div>
       )}
+
+      {/* 6. [1초 익명 온기 쪽지 보내기] 모달 */}
+      <SendComfortNoteModal
+        failure={currentItem?.failure || null}
+        isOpen={isNoteModalOpen}
+        onClose={() => setIsNoteModalOpen(false)}
+      />
     </div>
   );
 }

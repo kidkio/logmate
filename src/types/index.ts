@@ -25,6 +25,15 @@ export interface User {
   createdAt: string;
 }
 
+export interface ComfortNote {
+  id: string;
+  failureId: string;
+  targetUserId?: string;
+  fromNickname: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface Failure {
   id: string;
   deviceId: string;
@@ -40,6 +49,7 @@ export interface Failure {
   reportCount: number;
   isBlinded: boolean;
   isSeed?: boolean;
+  isOvercome?: boolean; // 극복 완료 여부 🌟
   createdAt: string; // ISO 8601
   similarityScore?: number; // 0.0 ~ 1.0 (유사도 검색 시)
 }

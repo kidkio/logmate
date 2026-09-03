@@ -1,4 +1,4 @@
-import { Failure, CategoryType, ReactionType, ReactionCounts } from '@/types';
+import { Failure, CategoryType, ReactionType, ReactionCounts, ComfortNote } from '@/types';
 import { INITIAL_SEED_FAILURES } from './seed-data';
 import { getEmbedding, cosineSimilarity, reviewModerationAI } from './gemini';
 import { createClient } from '@supabase/supabase-js';
@@ -266,6 +266,48 @@ class FailureStore {
     return my.map((f) => this.enrichWithUserReactions(f, deviceId));
   }
 
+  // 익명 온기 쪽지 저장소
+  private comfortNotes: ComfortNote[] = [];
+
+  async addComfortNote(data: {
+    failureId: string;
+    targetUserId?: string;
+    fromNickname: string;
+    message: string;
+  }): Promise<ComfortNote> {
+    await this.init();
+    const note: ComfortNote = {
+      id: 'note-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      failureId: data.failureId,
+      targetUserId: data.targetUserId,
+      fromNickname: data.fromNickname,
+      message: data.message.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    this.comfortNotes.unshift(note);
+    return note;
+  }
+
+  async getComfortNotesForUser(userId: string): Promise<ComfortNote[]> {
+    await this.init();
+    const userFailureIds = new Set(
+      Array.from(this.failures.values())
+        .filter((f) => f.userId === userId || f.deviceId === userId)
+        .map((f) => f.id)
+    );
+    return this.comfortNotes.filter(
+      (n) => (n.targetUserId && n.targetUserId === userId) || userFailureIds.has(n.failureId)
+    );
+  }
+
+  async toggleOvercome(failureId: string): Promise<Failure> {
+    await this.init();
+    const failure = this.failures.get(failureId);
+    if (!failure) throw new Error('Failure not found');
+    failure.isOvercome = !failure.isOvercome;
+    return failure;
+  }
+
   private enrichWithUserReactions(failure: Failure, deviceId?: string): Failure {
     if (!deviceId) return { ...failure, userReactions: [] };
     const userKey = `${failure.id}:${deviceId}`;
@@ -288,6 +330,7 @@ class FailureStore {
       reportCount: row.report_count || 0,
       isBlinded: row.is_blinded || false,
       isSeed: row.is_seed || false,
+      isOvercome: row.is_overcome || false,
       createdAt: row.created_at,
     };
     return this.enrichWithUserReactions(failure, deviceId);
@@ -295,3 +338,4 @@ class FailureStore {
 }
 
 export const failureStore = new FailureStore();
+

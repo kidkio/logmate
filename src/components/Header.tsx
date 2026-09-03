@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Moon, Sparkles, HeartHandshake, History, Clock } from 'lucide-react';
+import { SoundscapeToggle } from './SoundscapeToggle';
 
 interface HeaderProps {
   todaysCount: number;
@@ -42,19 +43,22 @@ export function Header({
             </div>
           </div>
 
-          <button
-            onClick={onOpenMyFailures}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all max-w-[140px] truncate"
-            title="내가 쓴 실패 모아보기"
-          >
-            <History className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-            <span className="truncate">{userNickname || '내 기록'}</span>
-            {myFailuresCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-indigo-500 text-[10px] text-white flex items-center justify-center font-bold flex-shrink-0">
-                {myFailuresCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <SoundscapeToggle />
+            <button
+              onClick={onOpenMyFailures}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all max-w-[120px] truncate"
+              title="내가 쓴 실패 모아보기"
+            >
+              <History className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+              <span className="truncate text-[11px]">{userNickname || '내 기록'}</span>
+              {myFailuresCount > 0 && (
+                <span className="w-3.5 h-3.5 rounded-full bg-indigo-500 text-[9px] text-white flex items-center justify-center font-bold flex-shrink-0">
+                  {myFailuresCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* 심리적 안정감 유도 카피 & 실시간 통계 바 */}
