@@ -50,10 +50,31 @@ async function saveLoungeData(data: LoungeData): Promise<void> {
   }
 }
 
-export async function GET() {
+// 실시간 접속자 세션 메모리 풀 (최근 45초 이내 핑/하트비트 유지)
+const activePresenceMap = new Map<string, number>();
+
+function recordPresence(req: NextRequest, clientKey?: string): number {
+  const now = Date.now();
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1';
+  const id = clientKey || ip;
+  activePresenceMap.set(id, now);
+
+  // 45초 이상 경과한 세션 자동 만료
+  for (const [key, ts] of activePresenceMap.entries()) {
+    if (now - ts > 45 * 1000) {
+      activePresenceMap.delete(key);
+    }
+  }
+
+  return Math.max(1, activePresenceMap.size);
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const deviceId = searchParams.get('deviceId') || undefined;
+  const activeCount = recordPresence(req, deviceId);
+
   const data = await getLoungeData();
-  // 심야 분위기를 살린 30~55명 사이의 동시 체류 온기 인원
-  const activeCount = 38 + (new Date().getMinutes() % 17);
   return NextResponse.json({
     success: true,
     candleCount: data.candleCount,
@@ -65,12 +86,17 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const activeCount = recordPresence(req, body.deviceId);
     const data = await getLoungeData();
+
+    if (body.action === 'heartbeat') {
+      return NextResponse.json({ success: true, activeCount, candleCount: data.candleCount });
+    }
 
     if (body.action === 'candle') {
       data.candleCount += 1;
       await saveLoungeData(data);
-      return NextResponse.json({ success: true, candleCount: data.candleCount });
+      return NextResponse.json({ success: true, candleCount: data.candleCount, activeCount });
     }
 
     if (body.action === 'whisper') {

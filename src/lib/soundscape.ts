@@ -1,33 +1,47 @@
-// 브라우저 Web Audio API 기반의 순수 절차적(Procedural) 앰비언트 사운드스케이프
-// 외부 오디오 파일 다운로드 0바이트, 100% 브라우저 자체 합성
+// 브라우저 Web Audio API 기반의 하이엔드 절차적(Procedural) ASMR 오디오 엔진
+// 4가지 사운드(빗소리, 모닥불, 밤바다 파도, 밤바람)를 각기 고유한 물리 음향 모델링으로 합성
 
 export type SoundMode = 'off' | 'rain' | 'fire' | 'wave' | 'wind';
+
+type SoundListener = (mode: SoundMode) => void;
 
 class SoundscapeManager {
   private ctx: AudioContext | null = null;
   private currentMode: SoundMode = 'off';
-  private gainNode: GainNode | null = null;
-  private noiseNode: AudioNode | null = null;
-  private crackleInterval: NodeJS.Timeout | null = null;
-  private lfoOsc: OscillatorNode | null = null;
-  private currentVolume: number = 0.35;
+  private masterGain: GainNode | null = null;
+  private currentVolume: number = 0.45;
+  private activeNodes: AudioNode[] = [];
+  private activeIntervals: (NodeJS.Timeout | number)[] = [];
+  private listeners: Set<SoundListener> = new Set();
+
+  public subscribe(listener: SoundListener): () => void {
+    this.listeners.add(listener);
+    listener(this.currentMode);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach((fn) => fn(this.currentMode));
+  }
 
   private initContext() {
     if (!this.ctx && typeof window !== 'undefined') {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
         this.ctx = new AudioContextClass();
-        this.gainNode = this.ctx.createGain();
-        this.gainNode.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
-        this.gainNode.connect(this.ctx.destination);
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
+        this.masterGain.connect(this.ctx.destination);
       }
     }
   }
 
   public setVolume(val: number) {
     this.currentVolume = Math.max(0, Math.min(1, val));
-    if (this.gainNode && this.ctx) {
-      this.gainNode.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setTargetAtTime(this.currentVolume, this.ctx.currentTime, 0.05);
     }
   }
 
@@ -35,24 +49,30 @@ class SoundscapeManager {
     return this.currentVolume;
   }
 
-  // 핑크 노이즈 버퍼 생성 (자연스러운 백색/핑크소음)
-  private createPinkNoiseBuffer(): AudioBuffer | null {
+  // 화이트 노이즈 버퍼
+  private createWhiteNoiseBuffer(durationSec = 2): AudioBuffer | null {
     if (!this.ctx) return null;
-    const bufferSize = this.ctx.sampleRate * 2;
+    const bufferSize = this.ctx.sampleRate * durationSec;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }
 
+  // 핑크/브라운 노이즈 버퍼 (깊은 저음 질감)
+  private createBrownNoiseBuffer(durationSec = 3): AudioBuffer | null {
+    if (!this.ctx) return null;
+    const bufferSize = this.ctx.sampleRate * durationSec;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let lastOut = 0.0;
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
-      b0 = 0.99886 * b0 + white * 0.0555179;
-      b1 = 0.99332 * b1 + white * 0.0750759;
-      b2 = 0.96900 * b2 + white * 0.1538520;
-      b3 = 0.86650 * b3 + white * 0.3104856;
-      b4 = 0.55000 * b4 + white * 0.5329522;
-      b5 = -0.7616 * b5 - white * 0.0168980;
-      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.06;
-      b6 = white * 0.115926;
+      data[i] = (lastOut + 0.02 * white) / 1.02;
+      lastOut = data[i];
+      data[i] *= 3.5; // 게인 보정
     }
     return buffer;
   }
@@ -63,127 +83,314 @@ class SoundscapeManager {
 
     if (mode === 'off') {
       this.currentMode = 'off';
+      this.notify();
       return;
     }
 
     this.initContext();
-    if (!this.ctx || !this.gainNode) return;
+    if (!this.ctx || !this.masterGain) return;
 
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
 
-    const noiseBuffer = this.createPinkNoiseBuffer();
-    if (!noiseBuffer) return;
+    const now = this.ctx.currentTime;
 
-    const noiseSource = this.ctx.createBufferSource();
-    noiseSource.buffer = noiseBuffer;
-    noiseSource.loop = true;
-
+    // =========================================================================
+    // 1. [RAIN: 포근한 창문 빗소리]
+    // =========================================================================
     if (mode === 'rain') {
-      // 빗소리: 700Hz 로우패스 필터 적용
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(650, this.ctx.currentTime);
-      filter.Q.setValueAtTime(1.2, this.ctx.currentTime);
+      // 레이어 1: 굵은 빗줄기 배경음 (브라운 노이즈 + 로우패스 480Hz)
+      const brownBuf = this.createBrownNoiseBuffer(3);
+      if (brownBuf) {
+        const brownSrc = this.ctx.createBufferSource();
+        brownSrc.buffer = brownBuf;
+        brownSrc.loop = true;
 
-      noiseSource.connect(filter);
-      filter.connect(this.gainNode);
-      noiseSource.start();
-      this.noiseNode = noiseSource;
-    } else if (mode === 'fire') {
-      // 모닥불: 따뜻한 저음 베이스 + 불규칙한 타닥타닥 크랙클
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(320, this.ctx.currentTime);
-      filter.Q.setValueAtTime(0.8, this.ctx.currentTime);
+        const lowFilter = this.ctx.createBiquadFilter();
+        lowFilter.type = 'lowpass';
+        lowFilter.frequency.setValueAtTime(450, now);
 
-      noiseSource.connect(filter);
-      filter.connect(this.gainNode);
-      noiseSource.start();
-      this.noiseNode = noiseSource;
+        const brownGain = this.ctx.createGain();
+        brownGain.gain.setValueAtTime(0.55, now);
 
-      // 타닥타닥 튀는 소리 합성
-      this.crackleInterval = setInterval(() => {
-        if (!this.ctx || !this.gainNode || Math.random() > 0.45) return;
+        brownSrc.connect(lowFilter);
+        lowFilter.connect(brownGain);
+        brownGain.connect(this.masterGain);
+        brownSrc.start();
+        this.activeNodes.push(brownSrc, lowFilter, brownGain);
+      }
+
+      // 레이어 2: 흩뿌려지는 잔잔한 빗방울 지지직 질감 (화이트 노이즈 + 밴드패스 2400Hz)
+      const whiteBuf = this.createWhiteNoiseBuffer(2);
+      if (whiteBuf) {
+        const whiteSrc = this.ctx.createBufferSource();
+        whiteSrc.buffer = whiteBuf;
+        whiteSrc.loop = true;
+
+        const drizzleFilter = this.ctx.createBiquadFilter();
+        drizzleFilter.type = 'bandpass';
+        drizzleFilter.frequency.setValueAtTime(2400, now);
+        drizzleFilter.Q.setValueAtTime(0.8, now);
+
+        const drizzleGain = this.ctx.createGain();
+        drizzleGain.gain.setValueAtTime(0.2, now);
+
+        whiteSrc.connect(drizzleFilter);
+        drizzleFilter.connect(drizzleGain);
+        drizzleGain.connect(this.masterGain);
+        whiteSrc.start();
+        this.activeNodes.push(whiteSrc, drizzleFilter, drizzleGain);
+      }
+
+      // 레이어 3: 창문에 톡톡 부딪히는 실제 빗방울 물방울 소리 (Random Damped Micro Sine Chirp)
+      const dropTimer = setInterval(() => {
+        if (!this.ctx || !this.masterGain || this.currentMode !== 'rain') return;
         try {
+          const t = this.ctx.currentTime;
           const osc = this.ctx.createOscillator();
-          const oscGain = this.ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(120 + Math.random() * 400, this.ctx.currentTime);
+          const gain = this.ctx.createGain();
 
-          const now = this.ctx.currentTime;
-          oscGain.gain.setValueAtTime(0.08 + Math.random() * 0.12, now);
-          oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          const startFreq = 800 + Math.random() * 600;
+          osc.frequency.setValueAtTime(startFreq, t);
+          osc.frequency.exponentialRampToValueAtTime(300, t + 0.035);
 
-          osc.connect(oscGain);
-          oscGain.connect(this.gainNode);
-          osc.start(now);
-          osc.stop(now + 0.05);
-        } catch (e) {
-          // ignore
-        }
-      }, 180);
-    } else if (mode === 'wave') {
-      // 파도: 400Hz 로우패스 + 8초 주기의 저주파(LFO)로 밀려왔다 나가는 파도 음향
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(400, this.ctx.currentTime);
+          gain.gain.setValueAtTime(0.04 + Math.random() * 0.07, t);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
 
-      const waveGain = this.ctx.createGain();
-      waveGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(t);
+          osc.stop(t + 0.04);
+        } catch {}
+      }, 120);
 
-      const lfo = this.ctx.createOscillator();
-      lfo.frequency.setValueAtTime(0.12, this.ctx.currentTime); // 8초 주기
-      const lfoGain = this.ctx.createGain();
-      lfoGain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+      this.activeIntervals.push(dropTimer);
+    }
 
-      lfo.connect(lfoGain);
-      lfoGain.connect(waveGain.gain);
-      lfo.start();
-      this.lfoOsc = lfo;
+    // =========================================================================
+    // 2. [FIRE: 타닥타닥 타오르는 장작 모닥불]
+    // =========================================================================
+    else if (mode === 'fire') {
+      const brownBuf = this.createBrownNoiseBuffer(3);
+      if (brownBuf) {
+        const fireSrc = this.ctx.createBufferSource();
+        fireSrc.buffer = brownBuf;
+        fireSrc.loop = true;
 
-      noiseSource.connect(filter);
-      filter.connect(waveGain);
-      waveGain.connect(this.gainNode);
-      noiseSource.start();
-      this.noiseNode = noiseSource;
-    } else if (mode === 'wind') {
-      // 밤바람: 480Hz 부드러운 밴드패스 필터
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(480, this.ctx.currentTime);
-      filter.Q.setValueAtTime(1.8, this.ctx.currentTime);
+        const flameFilter = this.ctx.createBiquadFilter();
+        flameFilter.type = 'lowpass';
+        flameFilter.frequency.setValueAtTime(140, now);
 
-      noiseSource.connect(filter);
-      filter.connect(this.gainNode);
-      noiseSource.start();
-      this.noiseNode = noiseSource;
+        const flameGain = this.ctx.createGain();
+        flameGain.gain.setValueAtTime(0.7, now);
+
+        fireSrc.connect(flameFilter);
+        flameFilter.connect(flameGain);
+        flameGain.connect(this.masterGain);
+        fireSrc.start();
+        this.activeNodes.push(fireSrc, flameFilter, flameGain);
+      }
+
+      const whiteBuf = this.createWhiteNoiseBuffer(2);
+      if (whiteBuf) {
+        const hissSrc = this.ctx.createBufferSource();
+        hissSrc.buffer = whiteBuf;
+        hissSrc.loop = true;
+
+        const hissFilter = this.ctx.createBiquadFilter();
+        hissFilter.type = 'bandpass';
+        hissFilter.frequency.setValueAtTime(750, now);
+        hissFilter.Q.setValueAtTime(1.5, now);
+
+        const hissGain = this.ctx.createGain();
+        hissGain.gain.setValueAtTime(0.12, now);
+
+        hissSrc.connect(hissFilter);
+        hissFilter.connect(hissGain);
+        hissGain.connect(this.masterGain);
+        hissSrc.start();
+        this.activeNodes.push(hissSrc, hissFilter, hissGain);
+      }
+
+      const crackleTimer = setInterval(() => {
+        if (!this.ctx || !this.masterGain || this.currentMode !== 'fire') return;
+        if (Math.random() > 0.6) return;
+
+        try {
+          const t = this.ctx.currentTime;
+          const burstCount = Math.floor(Math.random() * 3) + 1;
+
+          for (let i = 0; i < burstCount; i++) {
+            const burstOffset = i * (0.015 + Math.random() * 0.02);
+            const popBuf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.015), this.ctx.sampleRate);
+            const popData = popBuf.getChannelData(0);
+            for (let j = 0; j < popData.length; j++) {
+              popData[j] = (Math.random() * 2 - 1) * Math.exp(-j / (popData.length * 0.2));
+            }
+
+            const popSrc = this.ctx.createBufferSource();
+            popSrc.buffer = popBuf;
+
+            const popFilter = this.ctx.createBiquadFilter();
+            popFilter.type = 'bandpass';
+            popFilter.frequency.setValueAtTime(1800 + Math.random() * 2500, t + burstOffset);
+            popFilter.Q.setValueAtTime(5 + Math.random() * 5, t + burstOffset);
+
+            const popGain = this.ctx.createGain();
+            popGain.gain.setValueAtTime(0.25 + Math.random() * 0.35, t + burstOffset);
+
+            popSrc.connect(popFilter);
+            popFilter.connect(popGain);
+            popGain.connect(this.masterGain);
+
+            popSrc.start(t + burstOffset);
+          }
+        } catch {}
+      }, 100);
+
+      this.activeIntervals.push(crackleTimer);
+    }
+
+    // =========================================================================
+    // 3. [WAVE: 심야 바닷가 밀물과 썰물 파도]
+    // =========================================================================
+    else if (mode === 'wave') {
+      const brownBuf = this.createBrownNoiseBuffer(4);
+      if (brownBuf) {
+        const waveSrc = this.ctx.createBufferSource();
+        waveSrc.buffer = brownBuf;
+        waveSrc.loop = true;
+
+        const waveFilter = this.ctx.createBiquadFilter();
+        waveFilter.type = 'lowpass';
+        waveFilter.frequency.setValueAtTime(250, now);
+
+        const waveGain = this.ctx.createGain();
+        waveGain.gain.setValueAtTime(0.2, now);
+
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.setValueAtTime(0.105, now);
+
+        const lfoGainMod = this.ctx.createGain();
+        lfoGainMod.gain.setValueAtTime(0.35, now);
+        lfo.connect(lfoGainMod);
+        lfoGainMod.connect(waveGain.gain);
+
+        const lfoFilterMod = this.ctx.createGain();
+        lfoFilterMod.gain.setValueAtTime(600, now);
+        lfo.connect(lfoFilterMod);
+        lfoFilterMod.connect(waveFilter.frequency);
+
+        lfo.start();
+
+        waveSrc.connect(waveFilter);
+        waveFilter.connect(waveGain);
+        waveGain.connect(this.masterGain);
+        waveSrc.start();
+
+        this.activeNodes.push(waveSrc, waveFilter, waveGain, lfo, lfoGainMod, lfoFilterMod);
+      }
+    }
+
+    // =========================================================================
+    // 4. [WIND: 새벽 들판의 휘몰아치는 따뜻한 밤바람]
+    // =========================================================================
+    else if (mode === 'wind') {
+      const whiteBuf = this.createWhiteNoiseBuffer(3);
+      if (whiteBuf) {
+        const windSrc = this.ctx.createBufferSource();
+        windSrc.buffer = whiteBuf;
+        windSrc.loop = true;
+
+        const whistleFilter = this.ctx.createBiquadFilter();
+        whistleFilter.type = 'bandpass';
+        whistleFilter.frequency.setValueAtTime(420, now);
+        whistleFilter.Q.setValueAtTime(5.5, now);
+
+        const windLfo = this.ctx.createOscillator();
+        windLfo.type = 'triangle';
+        windLfo.frequency.setValueAtTime(0.22, now);
+
+        const windFilterMod = this.ctx.createGain();
+        windFilterMod.gain.setValueAtTime(260, now);
+        windLfo.connect(windFilterMod);
+        windFilterMod.connect(whistleFilter.frequency);
+
+        const windGain = this.ctx.createGain();
+        windGain.gain.setValueAtTime(0.38, now);
+
+        const windGainLfo = this.ctx.createOscillator();
+        windGainLfo.type = 'sine';
+        windGainLfo.frequency.setValueAtTime(0.14, now);
+        const windGainMod = this.ctx.createGain();
+        windGainMod.gain.setValueAtTime(0.2, now);
+        windGainLfo.connect(windGainMod);
+        windGainMod.connect(windGain.gain);
+
+        windLfo.start();
+        windGainLfo.start();
+
+        windSrc.connect(whistleFilter);
+        whistleFilter.connect(windGain);
+        windGain.connect(this.masterGain);
+        windSrc.start();
+
+        this.activeNodes.push(windSrc, whistleFilter, windGain, windLfo, windFilterMod, windGainLfo, windGainMod);
+      }
     }
 
     this.currentMode = mode;
+    this.notify();
+  }
+
+  // 온기 촛불 탭 시 재생되는 맑은 크리스탈 싱잉볼/차임벨 음향
+  public playCandleChime() {
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+
+    const t = this.ctx.currentTime;
+    const freqs = [739.99, 932.33, 1108.73];
+
+    freqs.forEach((f, idx) => {
+      if (!this.ctx || !this.masterGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t);
+
+      const delay = idx * 0.04;
+      gain.gain.setValueAtTime(0.0001, t + delay);
+      gain.gain.exponentialRampToValueAtTime(0.12 / (idx + 1), t + delay + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 1.2);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(t + delay);
+      osc.stop(t + delay + 1.3);
+    });
   }
 
   public stop() {
-    if (this.lfoOsc) {
+    this.activeIntervals.forEach((id) => clearInterval(id as any));
+    this.activeIntervals = [];
+
+    this.activeNodes.forEach((node) => {
       try {
-        this.lfoOsc.stop();
-        this.lfoOsc.disconnect();
-      } catch (e) {}
-      this.lfoOsc = null;
-    }
-    if (this.noiseNode) {
-      try {
-        (this.noiseNode as AudioBufferSourceNode).stop();
-        this.noiseNode.disconnect();
-      } catch (e) {}
-      this.noiseNode = null;
-    }
-    if (this.crackleInterval) {
-      clearInterval(this.crackleInterval);
-      this.crackleInterval = null;
-    }
+        if ('stop' in node && typeof (node as any).stop === 'function') {
+          (node as any).stop();
+        }
+        node.disconnect();
+      } catch {}
+    });
+    this.activeNodes = [];
+
     this.currentMode = 'off';
+    this.notify();
   }
 
   public getMode(): SoundMode {

@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
-import { Moon, Sparkles, History } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Moon, Sparkles, History, VolumeX } from 'lucide-react';
+import { soundscape, SoundMode } from '@/lib/soundscape';
 
 interface HeaderProps {
   todaysCount: number;
@@ -11,6 +12,14 @@ interface HeaderProps {
   userNickname?: string;
 }
 
+const SOUND_LABELS: Record<SoundMode, string> = {
+  off: '',
+  rain: '빗소리 🌧️',
+  fire: '모닥불 🔥',
+  wave: '파도 🌊',
+  wind: '밤바람 🍃',
+};
+
 export function Header({
   todaysCount,
   totalComforts,
@@ -18,6 +27,15 @@ export function Header({
   myFailuresCount,
   userNickname,
 }: HeaderProps) {
+  const [playingSound, setPlayingSound] = useState<SoundMode>('off');
+
+  useEffect(() => {
+    const unsub = soundscape.subscribe((mode) => {
+      setPlayingSound(mode);
+    });
+    return unsub;
+  }, []);
+
   return (
     <header className="w-full border-b border-white/[0.08] bg-slate-950/90 backdrop-blur-md sticky top-0 z-30 flex-shrink-0">
       <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between">
@@ -36,8 +54,21 @@ export function Header({
           </div>
         </div>
 
-        {/* 우측 실시간 온기 배지 및 내 기록 버튼 */}
-        <div className="flex items-center gap-2">
+        {/* 우측 액션: ASMR 끄기 플로팅 알약 + 온기 배지 + 내 기록 */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* ASMR 재생 중일 때: 어느 탭에서든 즉시 끌 수 있는 탑 바 버튼 */}
+          {playingSound !== 'off' && (
+            <button
+              onClick={() => soundscape.stop()}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse hover:bg-emerald-900/70 active:scale-95 transition-all"
+              title="현재 재생 중인 ASMR 끄기"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>{SOUND_LABELS[playingSound]} 끄기</span>
+              <VolumeX className="w-3 h-3 text-emerald-300" />
+            </button>
+          )}
+
           {totalComforts > 0 && (
             <div className="hidden xs:flex items-center gap-1 text-[10px] text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded-full border border-white/[0.06]">
               <Sparkles className="w-3 h-3 text-pink-400" />

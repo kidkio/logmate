@@ -20,7 +20,8 @@ import {
   Medal,
   Award,
   ArrowDown,
-  PenLine
+  PenLine,
+  ExternalLink
 } from 'lucide-react';
 import { SendComfortNoteModal } from './SendComfortNoteModal';
 
@@ -74,6 +75,58 @@ const REACTION_CONFIG: {
     emoji: '🍀',
     label: '내일은 성공',
     activeClass: 'bg-emerald-500/30 text-emerald-200 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)]',
+  },
+];
+
+interface CommercialAd {
+  id: string;
+  sponsor: string;
+  category: string;
+  title: string;
+  description: string;
+  cta: string;
+  url: string;
+  tag: string;
+  accentColor: string;
+  borderColor: string;
+}
+
+const REAL_COMMERCIAL_ADS: CommercialAd[] = [
+  {
+    id: 'millie_audiobook',
+    sponsor: '밀리의서재',
+    category: '오디오북 · 독서 쉼터',
+    title: '“잠 못 드는 밤, 차분하게 생각을 비우는 이야기”',
+    description: '불안과 자책 대신 다정한 목소리의 오디오북으로 편안하게 잠에 빠져보세요.',
+    cta: '첫 달 무료로 힐링 오디오북 듣기',
+    url: 'https://www.millie.co.kr',
+    tag: '신규 가입 1개월 무료',
+    accentColor: 'from-amber-950/70 to-purple-950/70',
+    borderColor: 'border-amber-500/40',
+  },
+  {
+    id: 'baemin_night',
+    sponsor: '배달의민족',
+    category: '심야 위로 푸드',
+    title: '“고생한 오늘 하루, 나를 위한 따뜻한 한 끼”',
+    description: '속이 따뜻해야 마음도 든든해집니다. 오늘 밤 나에게 맛있는 위로를 선물하세요.',
+    cta: '심야 힐링 배달 쿠폰팩 받기',
+    url: 'https://www.baemin.com',
+    tag: '심야 전용 5,000원 쿠폰팩',
+    accentColor: 'from-cyan-950/70 to-blue-950/70',
+    borderColor: 'border-cyan-500/40',
+  },
+  {
+    id: 'sleep_care',
+    sponsor: '마인드풀 슬립테크',
+    category: '웰니스 · 수면 테라피',
+    title: '“오늘 밤은 뒤척이지 않고 깊은 수면 속으로”',
+    description: '스트레스로 지친 뇌파를 안정시키는 천연 캐모마일 & 타트체리 릴랙스 케어.',
+    cta: '꿀잠 릴랙스 키트 둘러보기',
+    url: 'https://smartstore.naver.com',
+    tag: '무료 배송 혜택',
+    accentColor: 'from-emerald-950/70 to-teal-950/70',
+    borderColor: 'border-emerald-500/40',
   },
 ];
 
@@ -407,41 +460,68 @@ export function FailureShortsFeed({
                 </div>
               ) : null}
 
-              {/* [카드 타입 C: 스폰서 광고 및 프리미엄 결제 유도] */}
+              {/* [카드 타입 C: 실제 상업 스폰서 광고 및 프리미엄 결제 유도] */}
               {item.type === 'ad' ? (
-                <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
-                  <div className="my-auto space-y-4 max-w-sm mx-auto glass-card p-6 rounded-3xl border border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mx-auto shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-                      <BedDouble className="w-6 h-6" />
+                (() => {
+                  const adIndex = Math.abs(idx) % REAL_COMMERCIAL_ADS.length;
+                  const ad = REAL_COMMERCIAL_ADS[adIndex];
+
+                  return (
+                    <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
+                      <div className={`my-auto space-y-3.5 max-w-sm mx-auto glass-card p-5 sm:p-6 rounded-3xl border ${ad.borderColor} bg-gradient-to-b ${ad.accentColor} shadow-[0_0_40px_rgba(0,0,0,0.5)]`}>
+                        {/* 상단 스폰서 배지 & 카테고리 */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-amber-400 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                            <span>Sponsored · {ad.sponsor}</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold">{ad.category}</span>
+                        </div>
+
+                        {/* 실제 광고 제목 및 설명 */}
+                        <div className="space-y-1.5 text-left pt-1">
+                          <h3 className="text-sm sm:text-base font-black text-slate-100 leading-snug">
+                            {ad.title}
+                          </h3>
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {ad.description}
+                          </p>
+                        </div>
+
+                        {/* 광고 혜택 배지 */}
+                        <div className="flex items-center justify-between px-1 text-[11px] text-amber-300/90 bg-white/[0.03] p-2 rounded-xl border border-white/[0.06]">
+                          <span className="font-medium">특별 제휴 혜택</span>
+                          <span className="font-bold">{ad.tag}</span>
+                        </div>
+
+                        {/* 1. 실제 광고 랜딩페이지 이동 CTA */}
+                        <a
+                          href={ad.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-3 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 transition-all"
+                        >
+                          <span>{ad.cta}</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+
+                        {/* 2. 유료 이용권 구매 (광고 제거) 유도 */}
+                        <button
+                          onClick={onOpenPassModal}
+                          className="w-full py-2 rounded-xl font-semibold text-[11px] text-slate-400 hover:text-slate-200 bg-black/40 hover:bg-black/60 border border-white/10 active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all"
+                        >
+                          <Ticket className="w-3.5 h-3.5 text-amber-400" />
+                          <span>🎟️ 광고 없이 무제한으로 보기 (이용권)</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
+                        <span>아래로 스와이프하여 사연 계속 보기</span>
+                        <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
+                      </div>
                     </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                        Sponsored · 꿀잠 쉼터
-                      </span>
-                      <h3 className="text-sm sm:text-base font-black text-slate-100 leading-snug">
-                        “오늘 실패는 잊고 푹 주무세요”<br />
-                        마음을 편안하게 해주는 심야 테라피
-                      </h3>
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        실패를 털어놓은 당신은 이미 충분히 훌륭합니다.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={onOpenPassModal}
-                      className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 via-pink-500 to-indigo-500 hover:opacity-95 active:scale-[0.98] shadow-[0_0_25px_rgba(245,158,11,0.35)] animate-shimmer flex items-center justify-center gap-2"
-                    >
-                      <Ticket className="w-4 h-4 text-white" />
-                      <span>🎟️ 광고 없이 무제한으로 보기 (이용권)</span>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 pt-1 flex-shrink-0 animate-bounce">
-                    <span>아래로 스와이프하여 다음 이야기 보기</span>
-                    <ArrowDown className="w-3.5 h-3.5 text-indigo-400" />
-                  </div>
-                </div>
+                  );
+                })()
               ) : null}
 
               {/* [카드 타입 D: 오늘의 안식처 완성 엔딩 카드] */}
