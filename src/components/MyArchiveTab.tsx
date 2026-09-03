@@ -13,7 +13,9 @@ import {
   Mail, 
   CheckCircle2,
   Quote,
-  AlertTriangle
+  AlertTriangle,
+  Ticket,
+  RotateCcw
 } from 'lucide-react';
 import { FailureCard } from './FailureCard';
 import { MoonlightCalendar } from './MoonlightCalendar';
@@ -22,12 +24,16 @@ import { getDeviceId } from '@/lib/device';
 import { calculateWarmthProgress, getStoredWarmth, WarmthProgress } from '@/lib/warmthSystem';
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
+import { RefundModal } from './RefundModal';
 
 interface MyArchiveTabProps {
   myFailures: Failure[];
   onReaction: (failureId: string, type: ReactionType) => void;
   onReport: (failureId: string) => void;
   onOpenInstallGuide: () => void;
+  hasPass?: boolean;
+  onOpenPassModal?: () => void;
+  onPassCancelled?: () => void;
 }
 
 export function MyArchiveTab({
@@ -35,6 +41,9 @@ export function MyArchiveTab({
   onReaction,
   onReport,
   onOpenInstallGuide,
+  hasPass = false,
+  onOpenPassModal,
+  onPassCancelled,
 }: MyArchiveTabProps) {
   const { user, logout, withdrawAccount } = useAuth();
   const [comfortNotes, setComfortNotes] = useState<ComfortNote[]>([]);
@@ -46,6 +55,29 @@ export function MyArchiveTab({
     return calculateWarmthProgress(stored.lifetime, stored.spendable);
   });
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
+  const [passInfo, setPassInfo] = useState<{
+    plan?: string;
+    orderId?: string;
+    paymentKey?: string;
+    expiresAt?: string;
+    purchasedAt?: string;
+  } | null>(null);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const infoStr = localStorage.getItem('logmate_pass_info');
+      if (infoStr) {
+        try {
+          setPassInfo(JSON.parse(infoStr));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setPassInfo(null);
+      }
+    }
+  }, [hasPass]);
 
   useEffect(() => {
     const stored = getStoredWarmth();
@@ -222,7 +254,95 @@ export function MyArchiveTab({
         </div>
       </div>
 
-      {/* 2. [달빛 캘린더] 실패 기록 & 극복 궤적 */}
+      {/* 2. 프리미엄 멤버십 & 패스 관리 카드 */}
+      <div
+        className={`rounded-2xl sm:rounded-3xl p-4 sm:p-5 border shadow-lg space-y-3 transition-all ${
+          hasPass
+            ? 'bg-gradient-to-br from-indigo-950/70 via-purple-950/40 to-slate-900 border-indigo-500/40 shadow-[0_0_30px_rgba(99,102,241,0.15)]'
+            : 'bg-slate-900/60 border-white/[0.08]'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white ${
+                hasPass
+                  ? 'bg-gradient-to-tr from-amber-400 via-pink-500 to-indigo-500 shadow-md shadow-pink-500/20'
+                  : 'bg-slate-800 border border-white/10'
+              }`}
+            >
+              <Ticket className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                멤버십 상태
+              </span>
+              <h4 className="text-xs sm:text-sm font-black text-slate-100 flex items-center gap-1.5 flex-wrap mt-0.5">
+                {hasPass ? (
+                  <>
+                    <span className="text-amber-300">
+                      💎 {passInfo?.plan === 'day' ? '1일 자유 이용권' : passInfo?.plan === 'lifetime' ? '평생 VIP 프리미엄' : '30일 심야 무제한 패스'}
+                    </span>
+                    <span className="text-[9px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      이용 중
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>일반 회원</span>
+                    <span className="text-[9px] font-medium text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-white/5">
+                      광고 포함
+                    </span>
+                  </>
+                )}
+              </h4>
+            </div>
+          </div>
+
+          <div>
+            {hasPass ? (
+              <button
+                type="button"
+                onClick={() => setIsRefundModalOpen(true)}
+                className="text-[11px] font-semibold text-slate-400 hover:text-rose-300 underline underline-offset-4 transition-colors flex items-center gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>환불 / 결제 취소</span>
+              </button>
+            ) : (
+              onOpenPassModal && (
+                <button
+                  type="button"
+                  onClick={onOpenPassModal}
+                  className="py-1.5 px-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-pink-500 hover:opacity-90 active:scale-95 transition-all shadow-md shadow-amber-500/20"
+                >
+                  패스 구독하기 ➔
+                </button>
+              )
+            )}
+          </div>
+        </div>
+
+        {hasPass ? (
+          <div className="flex items-center justify-between text-[11px] bg-black/40 px-3.5 py-2.5 rounded-xl border border-white/5 font-mono text-slate-300">
+            <span className="text-slate-400">
+              {passInfo?.expiresAt
+                ? `만료: ${new Date(passInfo.expiresAt).toLocaleDateString()}`
+                : '만료 기한: 영구 무제한'}
+            </span>
+            <span className="text-emerald-400 font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>모든 광고 100% 차단 중</span>
+            </span>
+          </div>
+        ) : (
+          <p className="text-[11px] text-slate-400 leading-relaxed pt-0.5">
+            프리미엄 패스를 구독하시면 모든 광고가 완전 차단되며 숨겨진 공감 사연을 자유롭게 열람하실 수 있습니다.
+          </p>
+        )}
+      </div>
+
+      {/* 3. [달빛 캘린더] 실패 기록 & 극복 궤적 */}
       <MoonlightCalendar
         failures={failuresState}
         onSelectFailure={(f) => {
@@ -380,6 +500,17 @@ export function MyArchiveTab({
         isOpen={isLevelModalOpen}
         onClose={() => setIsLevelModalOpen(false)}
         progress={warmthProgress}
+      />
+
+      {/* 5. 이용권 환불 / 결제 취소 모달 */}
+      <RefundModal
+        isOpen={isRefundModalOpen}
+        onClose={() => setIsRefundModalOpen(false)}
+        passInfo={passInfo}
+        onRefundSuccess={() => {
+          setPassInfo(null);
+          if (onPassCancelled) onPassCancelled();
+        }}
       />
     </div>
   );

@@ -374,6 +374,9 @@ function MainApp() {
                 onReaction={handleReaction}
                 onReport={(id) => setReportingFailureId(id)}
                 onOpenInstallGuide={() => setIsInstallGuideOpen(true)}
+                hasPass={hasPass}
+                onOpenPassModal={() => setIsPassModalOpen(true)}
+                onPassCancelled={() => setHasPass(false)}
               />
             </div>
           )}
