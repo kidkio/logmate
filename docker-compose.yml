@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # 1. LogMate 웹 애플리케이션 (Next.js Standalone)
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: logmate-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - OLLAMA_HOST=http://ai:11434
+      - LOCAL_EMBED_MODEL=all-minilm
+      - LOCAL_LLM_MODEL=qwen2.5:1.5b
+      # 백업용 구글 Gemini API 키 (선택 사항)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      # 영구 사용자 데이터 및 실패 기록 보관
+      - ./data:/app/data
+    depends_on:
+      ai:
+        condition: service_started
+    networks:
+      - logmate-net
+
+  # 2. 로컬 AI 엔진 (Ollama 컨테이너: 임베딩 및 한국어 SLM)
+  ai:
+    image: ollama/ollama:latest
+    container_name: logmate-ai
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      # 다운로드된 AI 가중치 영구 저장 (재부팅 시 재다운로드 방지)
+      - ollama_models:/root/.ollama
+      - ./docker/entrypoint-ai.sh:/entrypoint-ai.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint-ai.sh"]
+    networks:
+      - logmate-net
+
+networks:
+  logmate-net:
+    driver: bridge
+
+volumes:
+  ollama_models:
+    name: logmate_ollama_models

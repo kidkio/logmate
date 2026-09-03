@@ -34,5 +34,23 @@
     "nickname": "용감한 고슴도치 #483",
     "provider": "kakao",
     "createdAt": "2026-09-03T16:18:07.863Z"
+  },
+  {
+    "id": "usr_mtlrl9mf_67d21fd1",
+    "email": "google_mtlrl9ko@logmate.social",
+    "passwordHash": "236418488cb99487c4de8a14822e2497265dea64d9fc709c17cca08b14cd6d1d8fd2d4acecb5dfed4f7d71fdc3adf0d386441d75d468b13545063c868c62819c",
+    "salt": "22c6287806bf4c358fff693143f8d59a",
+    "nickname": "길잃은 펭귄 #211",
+    "provider": "google",
+    "createdAt": "2026-09-03T16:53:49.431Z"
+  },
+  {
+    "id": "usr_mtlrmnhz_d5b05b2f",
+    "email": "google_mtlrmng4@logmate.social",
+    "passwordHash": "f76b7f0216ea72c98d447bc47c2d9d7222d431c6cc96f6dcc5c2e6d81a6c2190cee090805eb5892036949758d354c0eefa664a6446d93d191f6367fe9dd0eed9",
+    "salt": "4204ea9ab0e2d97d50c20356a511f04e",
+    "nickname": "야근하는 펭귄 #464",
+    "provider": "google",
+    "createdAt": "2026-09-03T16:54:54.071Z"
   }
 ]
