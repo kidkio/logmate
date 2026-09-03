@@ -1,0 +1,3 @@
+# Google AdSense Authorized Digital Sellers (ads.txt)
+# 구글 애드센스 승인 후 발급받으신 본인의 pub-XXXXXXXXXXXXXXXX 아이디로 교체해주시면 됩니다.
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
