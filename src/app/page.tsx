@@ -4,19 +4,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Failure, CategoryType, ReactionType, CreateFailureResponse } from '@/types';
 import { getDeviceId } from '@/lib/device';
 import { Header } from '@/components/Header';
-import { FailureForm } from '@/components/FailureForm';
 import { FailureFeed } from '@/components/FailureFeed';
-import { SimilarResultsModal } from '@/components/SimilarResultsModal';
 import { ReportModal } from '@/components/ReportModal';
-import { TodayStatusCard } from '@/components/TodayStatusCard';
-import { AdRewardModal } from '@/components/AdRewardModal';
 import { BottomNav, TabType } from '@/components/BottomNav';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { MyArchiveTab } from '@/components/MyArchiveTab';
 import { InstallGuideModal } from '@/components/InstallGuideModal';
 import { LandingAuth } from '@/components/LandingAuth';
+import { DailyRitualGate } from '@/components/DailyRitualGate';
+import { FailureShortsFeed } from '@/components/FailureShortsFeed';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { Moon, RefreshCw } from 'lucide-react';
+import { Moon } from 'lucide-react';
 
 function MainApp() {
   const { user, isLoading: authLoading } = useAuth();
@@ -32,14 +30,12 @@ function MainApp() {
   const [myTodayFailure, setMyTodayFailure] = useState<Failure | null>(null);
   const [todaySimilarCount, setTodaySimilarCount] = useState<number>(0);
 
-  // 3개 무료 열람 + 광고/이용권 잠금 해제 상태
+  // 3개 무료 열람 + 숏츠 광고 잠금 해제 상태
   const [unlockedCount, setUnlockedCount] = useState<number>(3);
-  const [isAdModalOpen, setIsAdModalOpen] = useState(false);
 
   // 모달 상태
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false);
-  const [similarModalResult, setSimilarModalResult] = useState<CreateFailureResponse | null>(null);
   const [reportingFailureId, setReportingFailureId] = useState<string | null>(null);
 
   // 실시간 통계
@@ -82,7 +78,7 @@ function MainApp() {
     }
   }, []);
 
-  // 오늘 작성 여부 확인 (userId 및 deviceId)
+  // 오늘 작성 여부 확인
   const fetchMyTodayStatus = useCallback(async () => {
     if (!deviceId) return;
     try {
@@ -146,23 +142,28 @@ function MainApp() {
     }
   }, [deviceId, user, fetchFailures, fetchMyFailures, fetchStats, fetchMyTodayStatus]);
 
-  // 글 작성 성공 핸들러
+  // 글 작성 성공 핸들러 -> 작성 즉시 숏츠 뷰로 자동 전환!
   const handleSuccessCreate = (result: CreateFailureResponse) => {
-    setSimilarModalResult(result);
     setMyTodayFailure(result.failure);
     setTodaySimilarCount(result.similarCount);
-    setFailures((prev) => [result.failure, ...prev]);
+    // 상위 3개 유사 실패를 우선 배치
+    const otherFailures = failures.filter(
+      (f) => f.id !== result.failure.id && !result.similarFailures.some((sf) => sf.id === f.id)
+    );
+    setFailures([...result.similarFailures, ...otherFailures]);
     setMyFailures((prev) => [result.failure, ...prev]);
     fetchStats();
+    setActiveTab('today');
   };
 
-  // 잠금 해제 (광고 시청 또는 이용권)
-  const handleUnlockReward = (mode: 'plus3' | 'all') => {
-    if (mode === 'plus3') {
-      setUnlockedCount((prev) => prev + 3);
-    } else {
-      setUnlockedCount(9999);
-    }
+  // 숏츠에서 광고 시청 후 3개 추가 잠금 해제
+  const handleUnlockMore = (count: number) => {
+    setUnlockedCount((prev) => prev + count);
+  };
+
+  // 이용권으로 전체 잠금 해제
+  const handleUnlockAll = () => {
+    setUnlockedCount(9999);
   };
 
   // 리액션 핸들러
@@ -195,15 +196,6 @@ function MainApp() {
     setMyFailures((prev) => updateList(prev));
     if (myTodayFailure && myTodayFailure.id === failureId) {
       setMyTodayFailure((prev) => (prev ? updateList([prev])[0] : null));
-    }
-    if (similarModalResult) {
-      setSimilarModalResult((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          similarFailures: updateList(prev.similarFailures),
-        };
-      });
     }
 
     try {
@@ -251,7 +243,6 @@ function MainApp() {
     }
   };
 
-  // 로그인 상태 로딩 중 화면
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-400">
@@ -263,16 +254,16 @@ function MainApp() {
     );
   }
 
-  // 비로그인 사용자 -> 랜딩 & 소셜/이메일 로그인 게이트웨이 노출
+  // 1. 비로그인 사용자 -> 실제 가입/로그인 게이트웨이 노출
   if (!user) {
     return <LandingAuth />;
   }
 
   return (
     <div className="min-h-screen bg-black flex justify-center selection:bg-indigo-500 selection:text-white">
-      {/* 모바일 웹앱 컨테이너 (App Shell) */}
-      <main className="w-full max-w-md min-h-screen bg-slate-950 text-slate-100 flex flex-col relative pb-20 shadow-2xl border-x border-slate-900/80 antialiased">
-        {/* 상단 앱 헤더 */}
+      {/* 모바일 웹앱 컨테이너 */}
+      <main className="w-full max-w-md min-h-screen bg-[#030712] text-slate-100 flex flex-col relative pb-20 shadow-[0_0_80px_rgba(0,0,0,0.9)] border-x border-white/[0.06] antialiased">
+        {/* 상단 헤더 */}
         <Header
           todaysCount={stats.todaysCount}
           totalComforts={stats.totalComforts}
@@ -282,59 +273,37 @@ function MainApp() {
         />
 
         {/* 탭별 뷰 렌더링 */}
-        <div className="flex-1 px-4 py-5 space-y-6">
+        <div className="flex-1 px-4 py-3">
           {activeTab === 'today' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* 1일 1회 작성 상태 카드 or 작성 폼 */}
-              {myTodayFailure ? (
-                <TodayStatusCard
-                  failure={myTodayFailure}
-                  similarCount={todaySimilarCount}
-                  onReaction={handleReaction}
-                  onReport={(id) => setReportingFailureId(id)}
+            <div>
+              {/* 핵심 비즈니스 로직: 오늘 아직 실패를 작성하지 않았으면 -> 작성 게이트 먼저 표시! */}
+              {!myTodayFailure ? (
+                <DailyRitualGate
+                  onSuccess={handleSuccessCreate}
+                  onExploreAnyway={() => setActiveTab('explore')}
                 />
               ) : (
-                <FailureForm onSuccess={handleSuccessCreate} />
-              )}
-
-              {/* 오늘의 추천 유사 피드 (기본 3개 무료 + 잠금 해제) */}
-              <div className="pt-2">
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-200">
-                      오늘 사람들의 실패 이야기
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      기본 3명 무료 열람 · 추가는 광고/패스로 잠금 해제
-                    </p>
-                  </div>
-                  <span className="text-xs text-indigo-400 font-semibold bg-indigo-950/60 border border-indigo-800/40 px-2 py-0.5 rounded-full">
-                    {Math.min(failures.length, unlockedCount)}/{failures.length}개
-                  </span>
+                /* 오늘 작성 완료 시 -> 유튜브 숏츠 스타일의 실패 숏폼 피드 바로 재생! */
+                <div className="space-y-3 animate-in fade-in duration-300">
+                  <FailureShortsFeed
+                    failures={failures}
+                    myTodayFailure={myTodayFailure}
+                    similarCount={todaySimilarCount}
+                    onReaction={handleReaction}
+                    onReport={(id) => setReportingFailureId(id)}
+                    unlockedCount={unlockedCount}
+                    onUnlockMore={handleUnlockMore}
+                    onUnlockAll={handleUnlockAll}
+                  />
                 </div>
-
-                <FailureFeed
-                  failures={failures}
-                  activeCategory={activeCategory}
-                  onSelectCategory={setActiveCategory}
-                  activeSort={activeSort}
-                  onSelectSort={setActiveSort}
-                  onReaction={handleReaction}
-                  onReport={(id) => setReportingFailureId(id)}
-                  isLoading={isLoading}
-                  unlockedCount={unlockedCount}
-                  onOpenAdModal={() => setIsAdModalOpen(true)}
-                />
-              </div>
+              )}
             </div>
           )}
 
           {activeTab === 'explore' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               <div className="px-1 space-y-1">
-                <h2 className="text-base font-bold text-slate-100">
-                  모든 실패 둘러보기
-                </h2>
+                <h2 className="text-base font-bold text-slate-100">모든 실패 둘러보기</h2>
                 <p className="text-xs text-slate-400">
                   카테고리별로 공감 가는 사연을 탐색하고 따뜻한 위로를 전해보세요.
                 </p>
@@ -350,7 +319,7 @@ function MainApp() {
                 onReport={(id) => setReportingFailureId(id)}
                 isLoading={isLoading}
                 unlockedCount={9999}
-                onOpenAdModal={() => setIsAdModalOpen(true)}
+                onOpenAdModal={() => setUnlockedCount(9999)}
               />
             </div>
           )}
@@ -365,39 +334,23 @@ function MainApp() {
           )}
         </div>
 
-        {/* 하단 모바일 웹앱 네비게이션 바 */}
+        {/* 하단 플로팅 독 네비게이션 */}
         <BottomNav
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           myFailuresCount={myFailures.length}
         />
 
-        {/* 첫 방문 몰입형 온보딩 모달 */}
+        {/* 온보딩 모달 */}
         <OnboardingModal
           isOpen={isOnboardingOpen}
           onComplete={handleCompleteOnboarding}
         />
 
-        {/* 홈 화면 추가(PWA 설치) 안내 모달 */}
+        {/* PWA 앱 설치 가이드 모달 */}
         <InstallGuideModal
           isOpen={isInstallGuideOpen}
           onClose={() => setIsInstallGuideOpen(false)}
-        />
-
-        {/* 작성 직후 유사 실패 AI 매칭 모달 */}
-        <SimilarResultsModal
-          result={similarModalResult}
-          onClose={() => setSimilarModalResult(null)}
-          onReaction={handleReaction}
-          onReport={(id) => setReportingFailureId(id)}
-        />
-
-        {/* 광고 시청 / 이용권 모달 */}
-        <AdRewardModal
-          isOpen={isAdModalOpen}
-          onClose={() => setIsAdModalOpen(false)}
-          onUnlockSuccess={handleUnlockReward}
-          remainingLockedCount={Math.max(0, failures.length - unlockedCount)}
         />
 
         {/* 신고 모달 */}

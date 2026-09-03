@@ -7,5 +7,32 @@
     "nickname": "용감한 펭귄 #77",
     "provider": "email",
     "createdAt": "2026-09-03T16:15:01.853Z"
+  },
+  {
+    "id": "usr_mtlqamr2_8018e683",
+    "email": "kakao_mtlqampd@logmate.social",
+    "passwordHash": "c68bc8d8d648f5e500dcc0f85762098299cf08c898149adb0821c032befa5178f442bc027bb0b43e5b2a599ca2cb8bf16e6dde47d5bb4801ec52997383f942fe",
+    "salt": "8698f14742f53821b1f373a42697ebba",
+    "nickname": "꿈꾸는 곰돌이 #752",
+    "provider": "kakao",
+    "createdAt": "2026-09-03T16:17:33.614Z"
+  },
+  {
+    "id": "usr_mtlqanvx_d650b3b5",
+    "email": "google_mtlqantp@logmate.social",
+    "passwordHash": "a0c43577a63fda6ccf92e5085471ceaabab1032253f7ab4b83b9cbb5aef1ed86169b347650b5c9caf362939b9b95a7cdcb27558beb289e939ae7652baee4b11e",
+    "salt": "19262fb8291dfa75cec82296006d6907",
+    "nickname": "길잃은 수달 #633",
+    "provider": "google",
+    "createdAt": "2026-09-03T16:17:35.085Z"
+  },
+  {
+    "id": "usr_mtlqbd6f_7092745a",
+    "email": "kakao_mtlqbd4p@logmate.social",
+    "passwordHash": "ca9016621a67e31749a3f8b38ab137a7080651f1d15bb79fd30f034d540898831eb83077736125107ab1ebce68443373333fb47df0ae52652c8671d88b8adfd0",
+    "salt": "771ed4eb6692513339f57bd7485c601a",
+    "nickname": "용감한 고슴도치 #483",
+    "provider": "kakao",
+    "createdAt": "2026-09-03T16:18:07.863Z"
   }
 ]
