@@ -16,6 +16,7 @@ import { FailureShortsFeed } from '@/components/FailureShortsFeed';
 import { PassPurchaseModal } from '@/components/PassPurchaseModal';
 import { MidnightLoungeTab } from '@/components/MidnightLoungeTab';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { getStoredWarmth } from '@/lib/warmthSystem';
 import { Moon, Sparkles } from 'lucide-react';
 
 function MainApp() {
@@ -51,7 +52,7 @@ function MainApp() {
     totalComforts: 0,
   });
 
-  // 초기화 (기기 식별자, 온보딩, 패스 체크)
+  // 초기화 (기기 식별자, 온보딩, 패스 체크, 결제 완료 감지)
   useEffect(() => {
     const id = getDeviceId();
     setDeviceId(id);
@@ -64,6 +65,29 @@ function MainApp() {
     const savedPass = localStorage.getItem('logmate_has_pass');
     if (savedPass === 'true') {
       setHasPass(true);
+    }
+
+    // 결제 완료/실패 콜백 처리
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const paymentStatus = params.get('payment');
+      if (paymentStatus === 'success') {
+        const plan = params.get('plan');
+        setHasPass(true);
+        localStorage.setItem('logmate_has_pass', 'true');
+        const planNames: Record<string, string> = {
+          day: '1일 자유 이용권',
+          month: '30일 심야 무제한 패스',
+          lifetime: '평생 VIP 프리미엄 멤버십',
+        };
+        const planName = plan && planNames[plan] ? planNames[plan] : '프리미엄 패스';
+        alert(`🎉 축하합니다! ${planName} 결제가 완료되었습니다!\n모든 광고가 제거되었으며 프리미엄 혜택이 즉시 적용되었습니다.`);
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (paymentStatus === 'fail') {
+        const msg = params.get('message') || '결제가 취소되었거나 실패했습니다.';
+        alert(`결제 실패: ${msg}`);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
 
     const justSignedUp = localStorage.getItem('logmate_just_signed_up');
@@ -367,6 +391,11 @@ function MainApp() {
           isOpen={isPassModalOpen}
           onClose={() => setIsPassModalOpen(false)}
           onPurchaseSuccess={handlePassPurchaseSuccess}
+          userWarmth={getStoredWarmth().spendable}
+          onOpenWarmthShop={() => {
+            setIsPassModalOpen(false);
+            setActiveTab('lounge');
+          }}
         />
 
         {/* 온보딩 모달 */}
