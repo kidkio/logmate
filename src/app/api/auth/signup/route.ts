@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUser, createSession } from '@/lib/user-store';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rate = checkRateLimit(`signup_${ip}`, 5, 10 * 60 * 1000); // 10분에 5회 제한
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { success: false, error: '짧은 시간 동안 너무 많은 회원가입 요청이 발생했습니다. 잠시 후 다시 시도해주세요.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { email, password, nickname } = body;
 
