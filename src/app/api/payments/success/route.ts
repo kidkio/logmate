@@ -7,9 +7,10 @@ export async function GET(request: NextRequest) {
   const paymentKey = searchParams.get('paymentKey');
   const orderId = searchParams.get('orderId');
   const amount = searchParams.get('amount');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://logmate.duckdns.org';
 
   if (!paymentKey || !orderId || !amount) {
-    return NextResponse.redirect(new URL('/?payment=fail&message=잘못된+결제+정보입니다', request.url));
+    return NextResponse.redirect(`${appUrl}/?payment=fail&message=잘못된+결제+정보입니다`);
   }
 
   const secretKey = process.env.TOSS_SECRET_KEY || DEFAULT_TEST_SECRET_KEY;
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     if (!response.ok) {
       console.error('Toss payment confirm error:', paymentData);
       const errMsg = encodeURIComponent(paymentData.message || '결제 승인 중 오류가 발생했습니다.');
-      return NextResponse.redirect(new URL(`/?payment=fail&message=${errMsg}`, request.url));
+      return NextResponse.redirect(`${appUrl}/?payment=fail&message=${errMsg}`);
     }
 
     // 주문 번호에서 플랜 분석 (LOGMATE_DAY_... / LOGMATE_MONTH_... / LOGMATE_LIFETIME_...)
@@ -92,6 +93,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Payment confirm failed:', error);
-    return NextResponse.redirect(new URL('/?payment=fail&message=결제+승인+연결+실패', request.url));
+    return NextResponse.redirect(`${appUrl}/?payment=fail&message=결제+승인+연결+실패`);
   }
 }
