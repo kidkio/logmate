@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Moon, Compass, BookHeart } from 'lucide-react';
+import { Moon, Flame, BookHeart } from 'lucide-react';
 
-export type TabType = 'today' | 'explore' | 'archive';
+export type TabType = 'today' | 'lounge' | 'archive';
 
 interface BottomNavProps {
   activeTab: TabType;
@@ -19,9 +19,9 @@ export function BottomNav({ activeTab, onChangeTab, myFailuresCount }: BottomNav
       icon: Moon,
     },
     {
-      id: 'explore' as TabType,
-      label: '둘러보기',
-      icon: Compass,
+      id: 'lounge' as TabType,
+      label: '심야 라운지',
+      icon: Flame,
     },
     {
       id: 'archive' as TabType,

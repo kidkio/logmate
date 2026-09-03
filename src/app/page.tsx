@@ -14,6 +14,7 @@ import { LandingAuth } from '@/components/LandingAuth';
 import { DailyRitualGate } from '@/components/DailyRitualGate';
 import { FailureShortsFeed } from '@/components/FailureShortsFeed';
 import { PassPurchaseModal } from '@/components/PassPurchaseModal';
+import { MidnightLoungeTab } from '@/components/MidnightLoungeTab';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Moon } from 'lucide-react';
 
@@ -292,7 +293,7 @@ function MainApp() {
                 /* 아직 작성하지 않았으면: 털어놓기 게이트 먼저 표시 */
                 <DailyRitualGate
                   onSuccess={handleSuccessCreate}
-                  onExploreAnyway={() => setActiveTab('explore')}
+                  onExploreAnyway={() => setActiveTab('lounge')}
                 />
               ) : (
                 /* 작성 완료 시: 유사한 3종 사연이 1~3위로 최우선 노출되는 숏츠 뷰 */
@@ -311,28 +312,8 @@ function MainApp() {
             </div>
           )}
 
-          {activeTab === 'explore' && (
-            <div className="w-full h-full flex-1 overflow-y-auto space-y-3 pr-1">
-              <div className="px-1 space-y-0.5">
-                <h2 className="text-sm font-bold text-slate-100">모든 실패 둘러보기</h2>
-                <p className="text-[11px] text-slate-400">
-                  카테고리별로 공감 가는 사연을 탐색하고 따뜻한 위로를 전해보세요.
-                </p>
-              </div>
-
-              <FailureFeed
-                failures={failures}
-                activeCategory={activeCategory}
-                onSelectCategory={setActiveCategory}
-                activeSort={activeSort}
-                onSelectSort={setActiveSort}
-                onReaction={handleReaction}
-                onReport={(id) => setReportingFailureId(id)}
-                isLoading={isLoading}
-                unlockedCount={9999}
-                onOpenAdModal={() => setIsPassModalOpen(true)}
-              />
-            </div>
+          {activeTab === 'lounge' && (
+            <MidnightLoungeTab user={user} deviceId={deviceId} />
           )}
 
           {activeTab === 'archive' && (

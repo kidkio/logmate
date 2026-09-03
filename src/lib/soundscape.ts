@@ -1,7 +1,7 @@
 // 브라우저 Web Audio API 기반의 순수 절차적(Procedural) 앰비언트 사운드스케이프
 // 외부 오디오 파일 다운로드 0바이트, 100% 브라우저 자체 합성
 
-export type SoundMode = 'off' | 'rain' | 'fire';
+export type SoundMode = 'off' | 'rain' | 'fire' | 'wave' | 'wind';
 
 class SoundscapeManager {
   private ctx: AudioContext | null = null;
@@ -9,6 +9,8 @@ class SoundscapeManager {
   private gainNode: GainNode | null = null;
   private noiseNode: AudioNode | null = null;
   private crackleInterval: NodeJS.Timeout | null = null;
+  private lfoOsc: OscillatorNode | null = null;
+  private currentVolume: number = 0.35;
 
   private initContext() {
     if (!this.ctx && typeof window !== 'undefined') {
@@ -16,10 +18,21 @@ class SoundscapeManager {
       if (AudioContextClass) {
         this.ctx = new AudioContextClass();
         this.gainNode = this.ctx.createGain();
-        this.gainNode.gain.setValueAtTime(0.35, this.ctx.currentTime);
+        this.gainNode.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
         this.gainNode.connect(this.ctx.destination);
       }
     }
+  }
+
+  public setVolume(val: number) {
+    this.currentVolume = Math.max(0, Math.min(1, val));
+    if (this.gainNode && this.ctx) {
+      this.gainNode.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
+    }
+  }
+
+  public getVolume(): number {
+    return this.currentVolume;
   }
 
   // 핑크 노이즈 버퍼 생성 (자연스러운 백색/핑크소음)
@@ -111,12 +124,54 @@ class SoundscapeManager {
           // ignore
         }
       }, 180);
+    } else if (mode === 'wave') {
+      // 파도: 400Hz 로우패스 + 8초 주기의 저주파(LFO)로 밀려왔다 나가는 파도 음향
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(400, this.ctx.currentTime);
+
+      const waveGain = this.ctx.createGain();
+      waveGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+
+      const lfo = this.ctx.createOscillator();
+      lfo.frequency.setValueAtTime(0.12, this.ctx.currentTime); // 8초 주기
+      const lfoGain = this.ctx.createGain();
+      lfoGain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+
+      lfo.connect(lfoGain);
+      lfoGain.connect(waveGain.gain);
+      lfo.start();
+      this.lfoOsc = lfo;
+
+      noiseSource.connect(filter);
+      filter.connect(waveGain);
+      waveGain.connect(this.gainNode);
+      noiseSource.start();
+      this.noiseNode = noiseSource;
+    } else if (mode === 'wind') {
+      // 밤바람: 480Hz 부드러운 밴드패스 필터
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(480, this.ctx.currentTime);
+      filter.Q.setValueAtTime(1.8, this.ctx.currentTime);
+
+      noiseSource.connect(filter);
+      filter.connect(this.gainNode);
+      noiseSource.start();
+      this.noiseNode = noiseSource;
     }
 
     this.currentMode = mode;
   }
 
   public stop() {
+    if (this.lfoOsc) {
+      try {
+        this.lfoOsc.stop();
+        this.lfoOsc.disconnect();
+      } catch (e) {}
+      this.lfoOsc = null;
+    }
     if (this.noiseNode) {
       try {
         (this.noiseNode as AudioBufferSourceNode).stop();

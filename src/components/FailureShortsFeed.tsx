@@ -18,6 +18,7 @@ import {
   Award,
   Mail,
   Moon,
+  Flame,
   Calendar,
   RotateCcw,
   Volume2
@@ -35,7 +36,7 @@ interface FailureShortsFeedProps {
   onReport: (failureId: string) => void;
   hasPass: boolean;
   onOpenPassModal: () => void;
-  onNavigateTab?: (tab: 'today' | 'explore' | 'archive') => void;
+  onNavigateTab?: (tab: 'today' | 'lounge' | 'archive') => void;
 }
 
 interface FeedItem {
@@ -389,16 +390,12 @@ export function FailureShortsFeed({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleSleepMode();
+                  onNavigateTab?.('lounge');
                 }}
-                className={`w-full py-2.5 sm:py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
-                  isSleeping
-                    ? 'bg-emerald-600 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]'
-                    : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-[0_0_25px_rgba(99,102,241,0.4)] hover:opacity-95'
-                }`}
+                className="w-full py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-gradient-to-r from-amber-500 via-orange-500 to-pink-600 text-white shadow-[0_0_25px_rgba(245,158,11,0.4)] hover:opacity-95"
               >
-                <Volume2 className="w-4 h-4" />
-                <span>{isSleeping ? '🌧️ 빗소리와 함께 잠드는 중...' : '🎧 편안한 빗소리 들으며 잠들기'}</span>
+                <Flame className="w-4 h-4 text-amber-200 fill-amber-200/30 animate-pulse" />
+                <span>🕯️ 이웃들이 깨어있는 심야 라운지 가기</span>
               </button>
 
               <button
