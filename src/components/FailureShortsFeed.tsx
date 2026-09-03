@@ -603,7 +603,7 @@ export function FailureShortsFeed({
 
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold text-pink-300 bg-pink-950/80 border border-pink-500/40 px-2.5 py-0.5 rounded-full">
-                        Google AdMob · 리워드 보상
+                        Google AdSense · 리워드 스폰서
                       </span>
                       <h3 className="text-base font-black text-slate-100">
                         숨겨진 공감 사연 3편 더 열어보기

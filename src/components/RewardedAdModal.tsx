@@ -98,7 +98,7 @@ export function RewardedAdModal({
 
             <div className="space-y-0.5">
               <span className="text-[10px] font-bold uppercase text-amber-300 tracking-wider">
-                Google AdMob · Premium Reward
+                Google AdSense · Premium Reward
               </span>
               <h4 className="text-sm font-bold text-slate-100">
                 마인드풀 슬립테크 & 심야 힐링 사운드
