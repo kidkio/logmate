@@ -17,17 +17,23 @@ export async function GET(req: NextRequest) {
     }
 
     const kakaoClientId = process.env.KAKAO_CLIENT_ID || '';
+    const kakaoClientSecret = process.env.KAKAO_CLIENT_SECRET || '';
 
     // 1. 인가 코드로 토큰 발급
+    const bodyParams = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: kakaoClientId,
+      redirect_uri: redirectUri,
+      code,
+    });
+    if (kakaoClientSecret) {
+      bodyParams.append('client_secret', kakaoClientSecret);
+    }
+
     const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: kakaoClientId,
-        redirect_uri: redirectUri,
-        code,
-      }),
+      body: bodyParams,
     });
 
     const tokenData = await tokenRes.json();
