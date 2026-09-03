@@ -545,44 +545,43 @@ export function FailureShortsFeed({
                 </div>
               ) : null}
 
-              {/* [카드 타입 C-2: 쿠팡 파트너스 심야 감성 맥락 매칭 제휴 상품] */}
+              {/* [카드 타입 C-2: 쿠팡 파트너스 공식 실시간 다이나믹 배너 & 힐링 큐레이션] */}
               {item.type === 'ad_coupang' ? (
                 <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 text-center relative z-10">
-                  <div className={`my-auto space-y-3.5 max-w-sm mx-auto glass-card p-5 sm:p-6 rounded-3xl border ${item.product.border} bg-gradient-to-b ${item.product.color} shadow-[0_0_40px_rgba(0,0,0,0.5)] text-left`}>
+                  <div className="my-auto space-y-3.5 max-w-sm mx-auto glass-card p-4 sm:p-5 rounded-3xl border border-amber-500/40 bg-gradient-to-b from-amber-950/70 via-slate-900 to-black shadow-[0_0_40px_rgba(0,0,0,0.5)] text-left">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase font-bold text-amber-300 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 flex items-center gap-1.5">
-                        <span>{item.product.icon} {item.product.badge}</span>
+                        <span>🍵 심야 숙면 & 힐링 큐레이션</span>
                       </span>
-                      <span className="text-[10px] text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30 font-mono">
-                        {item.product.discount}
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Coupang Partners
                       </span>
                     </div>
 
-                    <div className="space-y-1.5 pt-1">
-                      <h3 className="text-sm sm:text-base font-black text-slate-100 leading-snug">
-                        {item.product.title}
+                    <div className="space-y-1">
+                      <h3 className="text-xs sm:text-sm font-black text-slate-100 leading-snug">
+                        오늘 밤 지친 나를 위한 맞춤 힐링 아이템
                       </h3>
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        {item.product.description}
+                      <p className="text-[11px] text-slate-400">
+                        스트레스로 뒤척이는 밤, 나에게 꼭 필요한 숙면 및 테라피 상품을 둘러보세요.
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs bg-black/40 p-2.5 rounded-xl border border-white/10">
-                      <span className="text-amber-300 font-black text-sm font-mono">{item.product.price}</span>
-                      <span className="text-[10px] text-slate-400">{item.product.rating}</span>
+                    {/* 쿠팡 파트너스 공식 실시간 다이나믹 캐러셀 배너 */}
+                    <div className="w-full overflow-hidden rounded-2xl bg-slate-950/90 border border-white/10 min-h-[140px] flex items-center justify-center shadow-inner">
+                      <iframe
+                        src="https://ads-partners.coupang.com/widgets.html?id=1025741&template=carousel&trackingCode=AF4101329&subId=&width=100%&height=140px&tsource="
+                        width="100%"
+                        height="140"
+                        frameBorder="0"
+                        scrolling="no"
+                        referrerPolicy="unsafe-url"
+                        title="Coupang Feed Dynamic Banner"
+                        className="w-full h-[140px] rounded-2xl"
+                      />
                     </div>
 
-                    <a
-                      href={item.product.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-amber-500 via-pink-500 to-indigo-500 hover:from-amber-600 hover:to-indigo-600 active:scale-[0.98] shadow-lg shadow-amber-500/25 flex items-center justify-center gap-1.5 transition-all text-center"
-                    >
-                      <span>{item.product.cta}</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-
-                    <p className="text-[9px] text-slate-500 text-center leading-tight">
+                    <p className="text-[9px] text-slate-500 text-center leading-tight pt-1">
                       *이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
                     </p>
                   </div>

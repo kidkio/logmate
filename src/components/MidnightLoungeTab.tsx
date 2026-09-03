@@ -674,35 +674,38 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         </div>
       </div>
 
-      {/* 5. 심야 꿀잠 테라피 큐레이션 (쿠팡 파트너스 맥락 제휴) */}
-      <div className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900 to-black space-y-2.5">
+      {/* 5. 심야 꿀잠 테라피 큐레이션 (쿠팡 파트너스 공식 실시간 다이나믹 배너) */}
+      <div className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-gradient-to-br from-amber-950/30 via-slate-900 to-black space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-            <span>🍵 심야 꿀잠 테라피</span>
+            <span>🍵 심야 꿀잠 & 힐링 큐레이션</span>
           </span>
           <span className="text-[10px] text-slate-500 font-mono">Coupang Partners</span>
         </div>
+
         <div className="space-y-0.5">
           <h4 className="text-xs font-bold text-slate-200">
-            유기농 캐모마일 & 타트체리 꿀잠 티 (40티백)
+            오늘 밤 지친 나를 위한 숙면 & 힐링 특가
           </h4>
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            스트레스로 뒤척이는 밤, 뇌파를 부드럽게 이완시켜주는 따뜻한 수면 유도 허브차.
+            스트레스로 뒤척이는 밤, 실시간 쿠팡 로켓배송 인기 힐링 아이템을 만나보세요.
           </p>
         </div>
-        <div className="flex items-center justify-between text-xs bg-black/40 px-3 py-2 rounded-xl border border-white/10">
-          <span className="text-amber-300 font-bold font-mono">18,900원 (32% 특가)</span>
-          <span className="text-[10px] text-slate-400">4.9 ★★★★★</span>
+
+        {/* 쿠팡 파트너스 공식 실시간 다이나믹 캐러셀 위젯 */}
+        <div className="w-full overflow-hidden rounded-xl bg-slate-950/80 border border-white/[0.08] min-h-[140px] flex items-center justify-center">
+          <iframe
+            src="https://ads-partners.coupang.com/widgets.html?id=1025741&template=carousel&trackingCode=AF4101329&subId=&width=100%&height=140px&tsource="
+            width="100%"
+            height="140"
+            frameBorder="0"
+            scrolling="no"
+            referrerPolicy="unsafe-url"
+            title="Coupang Dynamic Banner"
+            className="w-full h-[140px] rounded-xl"
+          />
         </div>
-        <a
-          href="https://www.coupang.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20"
-        >
-          <span>로켓배송 최저가 둘러보기</span>
-          <ExternalLink className="w-3 h-3" />
-        </a>
+
         <p className="text-[9px] text-slate-500 text-center leading-tight">
           *이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
         </p>
