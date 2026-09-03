@@ -154,7 +154,7 @@ function MainApp() {
     }
   }, [deviceId, user, fetchFailures, fetchMyFailures, fetchStats, fetchMyTodayStatus]);
 
-  // 글 작성 성공 핸들러 -> 작성 즉시 숏츠 뷰로 자동 전환
+  // 글 작성 성공 핸들러
   const handleSuccessCreate = (result: CreateFailureResponse) => {
     setMyTodayFailure(result.failure);
     setTodaySimilarCount(result.similarCount);
@@ -246,7 +246,7 @@ function MainApp() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-400">
+      <div className="h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-400">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-pink-500 flex items-center justify-center text-white animate-pulse shadow-lg shadow-indigo-500/25">
           <Moon className="w-6 h-6" />
         </div>
@@ -255,16 +255,16 @@ function MainApp() {
     );
   }
 
-  // 1. 비로그인 사용자 -> 실제 가입/로그인 게이트웨이 노출
+  // 1. 비로그인 사용자
   if (!user) {
     return <LandingAuth />;
   }
 
   return (
-    <div className="min-h-screen bg-black flex justify-center selection:bg-indigo-500 selection:text-white">
-      {/* 모바일 웹앱 컨테이너 */}
-      <main className="w-full max-w-md min-h-screen bg-[#030712] text-slate-100 flex flex-col relative pb-20 shadow-[0_0_80px_rgba(0,0,0,0.9)] border-x border-white/[0.06] antialiased">
-        {/* 상단 헤더 */}
+    <div className="h-[100dvh] max-h-[100dvh] w-full bg-black flex justify-center selection:bg-indigo-500 selection:text-white overflow-hidden">
+      {/* 모바일 100dvh 뷰포트 맞춤 컨테이너 */}
+      <main className="w-full max-w-md h-[100dvh] max-h-[100dvh] bg-[#030712] text-slate-100 flex flex-col justify-between relative shadow-[0_0_80px_rgba(0,0,0,0.9)] border-x border-white/[0.06] antialiased overflow-hidden">
+        {/* 1. 상단 헤더 (높이 고정) */}
         <Header
           todaysCount={stats.todaysCount}
           totalComforts={stats.totalComforts}
@@ -273,38 +273,34 @@ function MainApp() {
           userNickname={user.nickname}
         />
 
-        {/* 탭별 뷰 렌더링 */}
-        <div className="flex-1 px-4 py-3">
+        {/* 2. 중앙 메인 뷰포트 (남은 공간을 100% 꽉 채우며 내부에서만 반응형 fit/scroll) */}
+        <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col px-3 sm:px-4 py-2">
           {activeTab === 'today' && (
-            <div>
-              {/* 오늘 아직 실패를 작성하지 않았으면 -> 작성 게이트 먼저 표시 */}
+            <div className="w-full h-full flex-1 min-h-0 flex flex-col">
               {!myTodayFailure ? (
                 <DailyRitualGate
                   onSuccess={handleSuccessCreate}
                   onExploreAnyway={() => setActiveTab('explore')}
                 />
               ) : (
-                /* 오늘 작성 완료 시 -> 인스타 터치 & 자동 광고 삽입 숏폼 피드 바로 재생 */
-                <div className="space-y-3 animate-in fade-in duration-300">
-                  <FailureShortsFeed
-                    failures={failures}
-                    myTodayFailure={myTodayFailure}
-                    similarCount={todaySimilarCount}
-                    onReaction={handleReaction}
-                    onReport={(id) => setReportingFailureId(id)}
-                    hasPass={hasPass}
-                    onOpenPassModal={() => setIsPassModalOpen(true)}
-                  />
-                </div>
+                <FailureShortsFeed
+                  failures={failures}
+                  myTodayFailure={myTodayFailure}
+                  similarCount={todaySimilarCount}
+                  onReaction={handleReaction}
+                  onReport={(id) => setReportingFailureId(id)}
+                  hasPass={hasPass}
+                  onOpenPassModal={() => setIsPassModalOpen(true)}
+                />
               )}
             </div>
           )}
 
           {activeTab === 'explore' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="px-1 space-y-1">
-                <h2 className="text-base font-bold text-slate-100">모든 실패 둘러보기</h2>
-                <p className="text-xs text-slate-400">
+            <div className="w-full h-full flex-1 overflow-y-auto space-y-3 pr-1">
+              <div className="px-1 space-y-0.5">
+                <h2 className="text-sm font-bold text-slate-100">모든 실패 둘러보기</h2>
+                <p className="text-[11px] text-slate-400">
                   카테고리별로 공감 가는 사연을 탐색하고 따뜻한 위로를 전해보세요.
                 </p>
               </div>
@@ -325,16 +321,18 @@ function MainApp() {
           )}
 
           {activeTab === 'archive' && (
-            <MyArchiveTab
-              myFailures={myFailures}
-              onReaction={handleReaction}
-              onReport={(id) => setReportingFailureId(id)}
-              onOpenInstallGuide={() => setIsInstallGuideOpen(true)}
-            />
+            <div className="w-full h-full flex-1 overflow-y-auto space-y-4 pr-1">
+              <MyArchiveTab
+                myFailures={myFailures}
+                onReaction={handleReaction}
+                onReport={(id) => setReportingFailureId(id)}
+                onOpenInstallGuide={() => setIsInstallGuideOpen(true)}
+              />
+            </div>
           )}
         </div>
 
-        {/* 하단 플로팅 독 네비게이션 */}
+        {/* 3. 하단 플로팅 독 네비게이션 (높이 고정) */}
         <BottomNav
           activeTab={activeTab}
           onChangeTab={setActiveTab}

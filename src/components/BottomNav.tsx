@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Moon, Compass, BookHeart, Sparkles } from 'lucide-react';
+import { Moon, Compass, BookHeart } from 'lucide-react';
 
 export type TabType = 'today' | 'explore' | 'archive';
 
@@ -32,9 +32,9 @@ export function BottomNav({ activeTab, onChangeTab, myFailuresCount }: BottomNav
   ];
 
   return (
-    <nav className="fixed bottom-3.5 left-4 right-4 z-40 max-w-sm mx-auto">
-      {/* 21st.dev 스타일 플로팅 글래스 독 (Floating Glass Dock) */}
-      <div className="bg-slate-900/80 backdrop-blur-2xl border border-white/[0.1] rounded-2xl p-1.5 shadow-[0_10px_35px_rgba(0,0,0,0.8)] flex items-center justify-around">
+    <nav className="w-full px-3 pb-2.5 pt-1 z-30 flex-shrink-0">
+      {/* 21st.dev 플로팅 아일랜드 독 */}
+      <div className="bg-slate-900/85 backdrop-blur-2xl border border-white/[0.1] rounded-2xl p-1 shadow-[0_10px_35px_rgba(0,0,0,0.7)] flex items-center justify-around">
         {navItems.map((item) => {
           const IconComponent = item.icon;
           const isActive = activeTab === item.id;
@@ -43,7 +43,7 @@ export function BottomNav({ activeTab, onChangeTab, myFailuresCount }: BottomNav
             <button
               key={item.id}
               onClick={() => onChangeTab(item.id)}
-              className={`flex-1 py-2 px-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${
+              className={`flex-1 py-2 px-2 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-200 relative ${
                 isActive
                   ? 'text-white font-bold bg-white/[0.08] shadow-[0_0_15px_rgba(99,102,241,0.2)]'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'

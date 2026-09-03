@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon, Compass } from 'lucide-react';
+import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { CreateFailureResponse } from '@/types';
 import { getDeviceId } from '@/lib/device';
@@ -12,15 +12,15 @@ interface DailyRitualGateProps {
 }
 
 const INSPIRATION_CHIPS = [
-  '업무/메일 실수 ✉️',
+  '업무 실수 ✉️',
   '다이어트 야식 🍜',
   '단톡방 말실수 💬',
-  '시험/과제 착각 📝',
+  '시험 착각 📝',
   '충동구매 💸',
-  '이불킥 해프닝 🛌',
+  '이불킥 🛌',
 ];
 
-export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateProps) {
+export function DailyRitualGate({ onSuccess }: DailyRitualGateProps) {
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,46 +68,45 @@ export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateP
   };
 
   return (
-    <div className="min-h-[82vh] flex flex-col justify-between py-2 animate-in fade-in duration-300">
+    <div className="w-full h-full flex flex-col justify-between py-1 overflow-y-auto no-scrollbar animate-in fade-in duration-300">
       {/* 상단 인트로 안내 */}
-      <div className="space-y-4 text-center pt-2">
-        <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white mx-auto shadow-[0_0_30px_rgba(99,102,241,0.35)]">
-          <Moon className="w-7 h-7 fill-white/20" />
+      <div className="space-y-2 text-center pt-1 flex-shrink-0">
+        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white mx-auto shadow-[0_0_25px_rgba(99,102,241,0.3)]">
+          <Moon className="w-5 h-5 fill-white/20" />
         </div>
 
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold text-indigo-300 bg-indigo-950/60 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-            <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-indigo-300 bg-indigo-950/60 border border-indigo-500/30">
+            <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />
             <span>오늘의 실패 털어놓기 리추얼</span>
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight leading-snug">
+          <h1 className="text-base sm:text-lg font-black text-slate-100 tracking-tight leading-snug">
             오늘 당신은 어떤<br />
             <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
               실패를 경험하셨나요?
             </span>
           </h1>
 
-          <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-            하루에 딱 한 번, 솔직하게 털어놓아 보세요.<br />
-            작성 즉시 <strong className="text-indigo-300">나와 똑같은 실패를 겪은 친구들의 숏폼 피드</strong>가 열립니다.
+          <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
+            솔직하게 털어놓으면 <strong className="text-indigo-300">나와 똑같은 실패를 겪은 친구들의 숏폼 피드</strong>가 바로 열립니다.
           </p>
         </div>
       </div>
 
       {/* 중앙 폼 입력 영역 */}
-      <div className="glass-card rounded-3xl p-5 sm:p-6 my-4 border border-white/[0.08] shadow-[0_10px_40px_rgba(0,0,0,0.5)] space-y-4">
+      <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-5 my-2 border border-white/[0.08] shadow-[0_10px_35px_rgba(0,0,0,0.5)] space-y-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-pink-400" />
-            <span>오늘 있었던 실수/자책 고백하기</span>
+            <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+            <span>오늘 있었던 실수 고백하기</span>
           </span>
           <span className="text-[10px] text-indigo-300 font-semibold bg-indigo-950/80 border border-indigo-700/50 px-2 py-0.5 rounded-full">
             {user?.nickname || '100% 익명'}
           </span>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} className="space-y-2.5">
           <div className="relative">
             <textarea
               value={content}
@@ -116,12 +115,12 @@ export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateP
                 if (errorMessage) setErrorMessage(null);
               }}
               placeholder="오늘 회사, 학교, 일상, 인간관계에서 자책했던 일이나 이불킥했던 순간을 솔직하게 털어놓으세요..."
-              rows={5}
+              rows={3}
               maxLength={500}
               disabled={isSubmitting}
-              className="w-full bg-[#050713]/90 text-slate-100 placeholder:text-slate-600 rounded-2xl p-4 text-sm leading-relaxed border border-white/[0.08] focus:border-indigo-500/80 focus:shadow-[0_0_25px_rgba(99,102,241,0.25)] outline-none resize-none transition-all"
+              className="w-full bg-[#050713]/90 text-slate-100 placeholder:text-slate-600 rounded-xl p-3 text-xs sm:text-sm leading-relaxed border border-white/[0.08] focus:border-indigo-500/80 focus:shadow-[0_0_20px_rgba(99,102,241,0.25)] outline-none resize-none transition-all"
             />
-            <div className="absolute bottom-3 right-3 text-[10px] text-slate-500 font-mono">
+            <div className="absolute bottom-2 right-2.5 text-[9px] text-slate-500 font-mono">
               <span className={content.length >= 5 ? 'text-indigo-400 font-bold' : 'text-slate-600'}>
                 {content.length}
               </span>
@@ -130,8 +129,8 @@ export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateP
           </div>
 
           {/* 영감 칩 */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className="text-[10px] text-slate-500 mr-1 font-medium">영감 힌트:</span>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-slate-500 mr-1 font-medium">영감:</span>
             {INSPIRATION_CHIPS.map((chip, idx) => (
               <button
                 key={idx}
@@ -141,7 +140,7 @@ export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateP
                     setContent((prev) => (prev ? `${prev} ${chip.split(' ')[0]}` : `${chip.split(' ')[0]} 실수: `));
                   }
                 }}
-                className="text-[10px] bg-white/[0.03] hover:bg-white/[0.08] text-slate-300 px-2.5 py-1 rounded-full border border-white/[0.06] transition-all active:scale-95"
+                className="text-[10px] bg-white/[0.03] hover:bg-white/[0.08] text-slate-300 px-2 py-0.5 rounded-full border border-white/[0.06] transition-all active:scale-95"
               >
                 {chip}
               </button>
@@ -149,8 +148,8 @@ export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateP
           </div>
 
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-[11px] flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
@@ -158,17 +157,17 @@ export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateP
           <button
             type="submit"
             disabled={isSubmitting || content.trim().length < 5}
-            className="w-full py-3.5 rounded-2xl font-bold text-sm text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:to-pink-600 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_25px_rgba(99,102,241,0.3)] animate-shimmer flex items-center justify-center gap-2 transition-all"
+            className="w-full py-3 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:to-pink-600 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(99,102,241,0.3)] animate-shimmer flex items-center justify-center gap-1.5 transition-all"
           >
             {isSubmitting ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>AI가 비슷한 실패 친구들을 찾는 중...</span>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>AI가 비슷한 친구들을 찾는 중...</span>
               </>
             ) : (
               <>
-                <Send className="w-4 h-4" />
-                <span>오늘의 실패 털어놓고 피드 열기</span>
+                <Send className="w-3.5 h-3.5" />
+                <span>오늘의 실패 털어놓고 숏폼 피드 열기</span>
               </>
             )}
           </button>
@@ -176,9 +175,9 @@ export function DailyRitualGate({ onSuccess, onExploreAnyway }: DailyRitualGateP
       </div>
 
       {/* 하단 안심 가이드 */}
-      <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 pb-2">
-        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-        <span>작성 즉시 AI 유사도 분석 및 100% 완전 익명으로 등록됩니다</span>
+      <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 pb-1 flex-shrink-0">
+        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+        <span>100% 완전 익명으로 등록되며 다른 사람의 실패가 열립니다</span>
       </div>
     </div>
   );
