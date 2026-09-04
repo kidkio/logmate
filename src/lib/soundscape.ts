@@ -1,7 +1,7 @@
 // 브라우저 Web Audio API 기반의 하이엔드 절차적(Procedural) ASMR 오디오 엔진
 // 4가지 사운드(빗소리, 모닥불, 밤바다 파도, 밤바람)의 독립 채널 믹싱 및 멀티 트랙 동시 조합 지원
 
-export type SoundChannel = 'rain' | 'fire' | 'wave' | 'wind';
+export type SoundChannel = 'rain' | 'fire' | 'wave' | 'wind' | 'snow';
 export type SoundMode = 'off' | SoundChannel | 'mix';
 
 export interface ChannelInfo {
@@ -41,6 +41,13 @@ export const SOUND_CHANNELS: Record<SoundChannel, ChannelInfo> = {
     description: '나뭇잎 스치는 부드러운 바람결',
     defaultVolume: 0.6,
   },
+  snow: {
+    id: 'snow',
+    name: '새벽 설원',
+    emoji: '❄️',
+    description: '눈 내리는 자작나무 숲의 고요한 침묵과 평온',
+    defaultVolume: 0.65,
+  },
 };
 
 export interface SoundPreset {
@@ -69,6 +76,7 @@ class SoundscapeManager {
     fire: 0.75,
     wave: 0.65,
     wind: 0.6,
+    snow: 0.65,
   };
 
   private channelGains: Record<SoundChannel, GainNode | null> = {
@@ -76,6 +84,7 @@ class SoundscapeManager {
     fire: null,
     wave: null,
     wind: null,
+    snow: null,
   };
 
   private channelNodes: Record<SoundChannel, AudioNode[]> = {
@@ -83,6 +92,7 @@ class SoundscapeManager {
     fire: [],
     wave: [],
     wind: [],
+    snow: [],
   };
 
   private channelIntervals: Record<SoundChannel, (NodeJS.Timeout | number)[]> = {
@@ -90,6 +100,7 @@ class SoundscapeManager {
     fire: [],
     wave: [],
     wind: [],
+    snow: [],
   };
 
   private listeners: Set<SoundListener> = new Set();
@@ -205,6 +216,27 @@ class SoundscapeManager {
       data[i] = (lastOut + 0.02 * white) / 1.02;
       lastOut = data[i];
       data[i] *= 3.5;
+    }
+    return buffer;
+  }
+
+  // 핑크 노이즈 버퍼 (설원 숲)
+  private createPinkNoiseBuffer(durationSec = 3): AudioBuffer | null {
+    if (!this.ctx) return null;
+    const bufferSize = this.ctx.sampleRate * durationSec;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+      b6 = white * 0.115926;
     }
     return buffer;
   }
@@ -455,6 +487,40 @@ class SoundscapeManager {
         windSrc.start();
 
         nodes.push(windSrc, whistleFilter, windGain, windLfo, windFilterMod, windGainLfo, windGainMod);
+      }
+    } else if (channel === 'snow') {
+      // 5. [VIP 설원 자작나무 숲] 고요한 핑크 노이즈 & 바스락 눈 밟는 사운드스케이프
+      const pinkBuf = this.createPinkNoiseBuffer(3);
+      if (pinkBuf) {
+        const snowSrc = this.ctx.createBufferSource();
+        snowSrc.buffer = pinkBuf;
+        snowSrc.loop = true;
+
+        const snowFilter = this.ctx.createBiquadFilter();
+        snowFilter.type = 'bandpass';
+        snowFilter.frequency.setValueAtTime(550, now);
+        snowFilter.Q.setValueAtTime(1.4, now);
+
+        const snowGain = this.ctx.createGain();
+        snowGain.gain.setValueAtTime(0.4, now);
+
+        // 부드러운 눈보라/침묵 모듈레이션
+        const snowLfo = this.ctx.createOscillator();
+        snowLfo.type = 'sine';
+        snowLfo.frequency.setValueAtTime(0.08, now);
+
+        const snowLfoGain = this.ctx.createGain();
+        snowLfoGain.gain.setValueAtTime(0.15, now);
+        snowLfo.connect(snowLfoGain);
+        snowLfoGain.connect(snowGain.gain);
+        snowLfo.start();
+
+        snowSrc.connect(snowFilter);
+        snowFilter.connect(snowGain);
+        snowGain.connect(channelGain);
+        snowSrc.start();
+
+        nodes.push(snowSrc, snowFilter, snowGain, snowLfo, snowLfoGain);
       }
     }
 

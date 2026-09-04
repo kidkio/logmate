@@ -7,9 +7,19 @@ import { User } from '@/types';
 import { RewardedAdModal } from './RewardedAdModal';
 import { Toast } from './Toast';
 import { WarmthShopModal } from './WarmthShopModal';
-import { calculateWarmthProgress, getStoredWarmth, addWarmth, spendWarmth, WarmthProgress } from '@/lib/warmthSystem';
+import { 
+  calculateWarmthProgress, 
+  getStoredWarmth, 
+  addWarmth, 
+  spendWarmth, 
+  getCooldownStatus,
+  CooldownStatus,
+  saveStoredPass,
+  WarmthProgress 
+} from '@/lib/warmthSystem';
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
+import { TarotModal } from './TarotModal';
 
 interface WhisperItem {
   id: string;
@@ -49,10 +59,33 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
 
   // 온기 레벨 & 진척도 상태
   const [warmthProgress, setWarmthProgress] = useState<WarmthProgress>(() => {
-    const stored = getStoredWarmth();
+    const stored = getStoredWarmth(user?.id);
     return calculateWarmthProgress(stored.lifetime, stored.spendable);
   });
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
+  const [isTarotModalOpen, setIsTarotModalOpen] = useState(false);
+  const [cooldownStatus, setCooldownStatus] = useState<CooldownStatus>(() => getCooldownStatus(user?.id));
+
+  // 유저 변경 시 해당 유저의 온기/레벨/쿨타임 즉시 재동기화
+  useEffect(() => {
+    const stored = getStoredWarmth(user?.id);
+    setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
+    setCooldownStatus(getCooldownStatus(user?.id));
+  }, [user?.id]);
+
+  // 1초 주기로 쿨타임 카운트다운 갱신
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCooldownStatus(getCooldownStatus(user?.id));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [user?.id]);
+
+  const formatCooldown = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
   // 사운드스케이프 멀티 채널 믹서 상태
   const [activeChannels, setActiveChannels] = useState<SoundChannel[]>(soundscape.getActiveChannels());
@@ -62,6 +95,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
     fire: soundscape.getChannelVolume('fire'),
     wave: soundscape.getChannelVolume('wave'),
     wind: soundscape.getChannelVolume('wind'),
+    snow: soundscape.getChannelVolume('snow'),
   });
   const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
 
@@ -147,10 +181,21 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
       setFloatingSparks((prev) => prev.filter((s) => !newSparks.some((ns) => ns.id === s.id)));
     }, 1500);
 
+    const warmthRes = addWarmth(1, user?.id);
+    if (!warmthRes.success) {
+      setToastMessage(`⏳ 촛불이 숨을 고르는 중입니다. (${formatCooldown(warmthRes.remainingCooldownSeconds)} 후 재충전)`);
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
     setCandleCount((prev) => prev + 1);
-    const warmthRes = addWarmth(1);
+    setCooldownStatus(getCooldownStatus(user?.id));
     setWarmthProgress(calculateWarmthProgress(warmthRes.lifetime, warmthRes.spendable));
-    if (warmthRes.leveledUp) {
+
+    if (warmthRes.cooldownTriggered) {
+      setToastMessage(`🔥 10 온기를 가득 채웠습니다! 촛불이 5분간 숨을 고릅니다.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } else if (warmthRes.leveledUp) {
       setToastMessage(`🎉 축하합니다! Lv.${warmthRes.newTier.level} [${warmthRes.newTier.title}]로 승급하셨습니다! 아바타 ${warmthRes.newTier.avatarEmoji} 해금!`);
       setTimeout(() => setToastMessage(null), 3500);
     }
@@ -370,19 +415,69 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           </p>
         </div>
 
+        {/* 온기 충전 게이지 & 쿨타임 인디케이터 */}
+        <div className="w-full max-w-xs mt-3 px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/[0.06] flex items-center justify-between text-[11px]">
+          {cooldownStatus.inCooldown ? (
+            <div className="flex items-center gap-1.5 text-amber-300 font-mono w-full justify-center">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span>촛불이 숨을 고르는 중...</span>
+              <strong className="text-amber-200 font-bold">{formatCooldown(cooldownStatus.remainingSeconds)}</strong>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 text-slate-400">
+                <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                <span>온기 충전 게이지</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden border border-white/5">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 to-pink-500 rounded-full transition-all duration-300"
+                    style={{ width: `${(cooldownStatus.currentEnergy / 10) * 100}%` }}
+                  />
+                </div>
+                <span className="font-mono font-bold text-amber-300 text-[10px]">
+                  {cooldownStatus.currentEnergy}/10
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* 인터랙티브 탭 버튼 & 5배 부스터 */}
-        <div className="flex flex-col sm:flex-row items-center gap-2 mt-3 w-full max-w-xs justify-center">
+        <div className="flex flex-col sm:flex-row items-center gap-2 mt-2 w-full max-w-xs justify-center">
           <button
             onClick={handleLightCandle}
-            className="w-full sm:w-auto flex-1 py-2 px-4 rounded-2xl text-xs font-bold text-amber-300 bg-amber-950/70 border border-amber-500/40 hover:bg-amber-900/70 active:scale-95 transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)] flex items-center justify-center gap-1.5"
+            disabled={cooldownStatus.inCooldown}
+            className={`w-full sm:w-auto flex-1 py-2 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              cooldownStatus.inCooldown
+                ? 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                : 'text-amber-300 bg-amber-950/70 border border-amber-500/40 hover:bg-amber-900/70 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.25)]'
+            }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin duration-3000" />
-            <span>온기 촛불 켜기 (+1)</span>
+            <span>
+              {cooldownStatus.inCooldown
+                ? `휴식 중 (${formatCooldown(cooldownStatus.remainingSeconds)})`
+                : '온기 촛불 켜기 (+1)'}
+            </span>
           </button>
 
           <button
-            onClick={() => setIsRewardedAdOpen(true)}
-            className="w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold text-pink-200 bg-pink-950/70 border border-pink-500/40 hover:bg-pink-900/70 active:scale-95 transition-all shadow-[0_0_20px_rgba(236,72,153,0.25)] flex items-center justify-center gap-1.5"
+            onClick={() => {
+              if (cooldownStatus.inCooldown) {
+                setToastMessage(`⏳ 촛불이 휴식 중입니다. (${formatCooldown(cooldownStatus.remainingSeconds)} 후 충전)`);
+                setTimeout(() => setToastMessage(null), 3000);
+                return;
+              }
+              setIsRewardedAdOpen(true);
+            }}
+            disabled={cooldownStatus.inCooldown}
+            className={`w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              cooldownStatus.inCooldown
+                ? 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'
+                : 'text-pink-200 bg-pink-950/70 border border-pink-500/40 hover:bg-pink-900/70 active:scale-95 shadow-[0_0_20px_rgba(236,72,153,0.25)]'
+            }`}
             title="15초 광고 시청 후 온기 5개 즉시 충전"
           >
             <Flame className="w-3.5 h-3.5 text-pink-400 fill-pink-400 animate-pulse" />
@@ -492,25 +587,28 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
             const info = SOUND_CHANNELS[ch];
             const isActive = activeChannels.includes(ch);
 
-            const iconMap = {
+            const iconMap: Record<SoundChannel, React.ReactNode> = {
               rain: <CloudRain className="w-4 h-4" />,
               fire: <Flame className="w-4 h-4" />,
               wave: <Waves className="w-4 h-4" />,
               wind: <Wind className="w-4 h-4" />,
+              snow: <Sparkles className="w-4 h-4" />,
             };
 
-            const activeColors = {
+            const activeColors: Record<SoundChannel, string> = {
               rain: 'border-indigo-400/60 bg-indigo-950/30 shadow-[0_0_18px_rgba(99,102,241,0.25)]',
               fire: 'border-amber-400/60 bg-amber-950/30 shadow-[0_0_18px_rgba(245,158,11,0.25)]',
               wave: 'border-cyan-400/60 bg-cyan-950/30 shadow-[0_0_18px_rgba(6,182,212,0.25)]',
               wind: 'border-emerald-400/60 bg-emerald-950/30 shadow-[0_0_18px_rgba(16,185,129,0.25)]',
+              snow: 'border-teal-400/60 bg-teal-950/30 shadow-[0_0_18px_rgba(45,212,191,0.25)]',
             };
 
-            const iconColors = {
+            const iconColors: Record<SoundChannel, string> = {
               rain: 'bg-indigo-500/20 text-indigo-400',
               fire: 'bg-amber-500/20 text-amber-400',
               wave: 'bg-cyan-500/20 text-cyan-400',
               wind: 'bg-emerald-500/20 text-emerald-400',
+              snow: 'bg-teal-500/20 text-teal-400',
             };
 
             return (
@@ -730,8 +828,15 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         onClose={() => setIsRewardedAdOpen(false)}
         rewardType="candle"
         onRewardClaimed={() => {
+          const warmthRes = addWarmth(5, user?.id);
+          if (!warmthRes.success) {
+            setToastMessage(`⏳ 촛불이 숨을 고르는 중입니다. (${formatCooldown(warmthRes.remainingCooldownSeconds)} 후 재충전)`);
+            setTimeout(() => setToastMessage(null), 3000);
+            return;
+          }
+
           setCandleCount((prev) => prev + 5);
-          const warmthRes = addWarmth(5);
+          setCooldownStatus(getCooldownStatus(user?.id));
           setWarmthProgress(calculateWarmthProgress(warmthRes.lifetime, warmthRes.spendable));
           soundscape.playCandleChime();
 
@@ -745,8 +850,10 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
             setFloatingSparks((prev) => prev.filter((s) => !burstSparks.some((b) => b.id === s.id)));
           }, 1400);
 
-          if (warmthRes.leveledUp) {
-            setToastMessage(`🎉 축하합니다! Lv.${warmthRes.newTier.level} [${warmthRes.newTier.title}]로 승급하셨습니다! 아바타 ${warmthRes.newTier.avatarEmoji} 해금!`);
+          if (warmthRes.cooldownTriggered) {
+            setToastMessage(`🔥 10 온기를 가득 채웠습니다! 촛불이 5분간 숨을 고릅니다.`);
+          } else if (warmthRes.leveledUp) {
+            setToastMessage(`🎉 축하합니다! Lv.${warmthRes.newTier.level} [${warmthRes.newTier.title}]로 승급하셨습니다!`);
           } else {
             setToastMessage('온기 5배 부스터가 적용되었습니다! ✨ (+5 온기)');
           }
@@ -760,43 +867,82 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         onClose={() => setIsWarmthShopOpen(false)}
         userWarmth={warmthProgress.spendableWarmth}
         onRedeemPass={() => {
-          const res = spendWarmth(30);
+          const res = spendWarmth(25, user?.id);
           if (!res.success) return;
-          const updated = getStoredWarmth();
+          const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('logmate_has_pass', 'true');
-          }
+          saveStoredPass({
+            plan: 'day',
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            purchasedAt: new Date().toISOString(),
+          }, user?.id);
           setToastMessage('🎉 축하합니다! 광고 없는 1일 이용권이 활성화되었습니다.');
           setTimeout(() => setToastMessage(null), 3000);
           setIsWarmthShopOpen(false);
         }}
-        onRedeemSimilar={() => {
-          const res = spendWarmth(5);
+        onRedeemTarot={() => {
+          const res = spendWarmth(5, user?.id);
           if (!res.success) return;
-          const updated = getStoredWarmth();
+          const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
-          setToastMessage('🔓 숨겨진 공감 사연 3편이 잠금 해제되었습니다!');
+          setIsWarmthShopOpen(false);
+          setIsTarotModalOpen(true);
+        }}
+        onRedeemSimilar={() => {
+          const res = spendWarmth(6, user?.id);
+          if (!res.success) return;
+          const updated = getStoredWarmth(user?.id);
+          setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
+          setToastMessage('🔓 숨겨진 공감 사연 3편이 즉시 잠금 해제되었습니다!');
+          setTimeout(() => setToastMessage(null), 3000);
+          setIsWarmthShopOpen(false);
+        }}
+        onRedeemNotePack={() => {
+          const res = spendWarmth(10, user?.id);
+          if (!res.success) return;
+          const updated = getStoredWarmth(user?.id);
+          setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
+          if (typeof window !== 'undefined') {
+            const key = user?.id ? `logmate_note_tickets_${user.id}` : 'logmate_note_tickets_guest';
+            const count = parseInt(localStorage.getItem(key) || '0', 10);
+            localStorage.setItem(key, (count + 3).toString());
+          }
+          setToastMessage('💌 익명 온기 쪽지 발송권 3장이 지급되었습니다!');
           setTimeout(() => setToastMessage(null), 3000);
           setIsWarmthShopOpen(false);
         }}
         onRedeemGoldenCandle={() => {
-          const res = spendWarmth(10);
+          const res = spendWarmth(12, user?.id);
           if (!res.success) return;
-          const updated = getStoredWarmth();
+          const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
           setToastMessage('🌟 오늘 내 사연에 황금 온기 촛불이 부착되었습니다!');
           setTimeout(() => setToastMessage(null), 3000);
           setIsWarmthShopOpen(false);
         }}
-        onRedeemBadge={() => {
-          const res = spendWarmth(50);
+        onRedeemHiddenSound={() => {
+          const res = spendWarmth(20, user?.id);
           if (!res.success) return;
-          const updated = getStoredWarmth();
+          const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
-          setToastMessage('👑 명예 칭호 "따뜻한 등대지기"를 획득하셨습니다!');
-          setTimeout(() => setToastMessage(null), 3000);
+          soundscape.startChannel('snow');
+          setToastMessage('🎧 VIP 히든 ASMR [새벽 설원 자작나무 숲] 사운드가 해금되어 재생됩니다!');
+          setTimeout(() => setToastMessage(null), 3500);
           setIsWarmthShopOpen(false);
+        }}
+      />
+
+      {/* 8. AI 실패 극복 힐링 타로 모달 */}
+      <TarotModal
+        isOpen={isTarotModalOpen}
+        onClose={() => setIsTarotModalOpen(false)}
+        userWarmth={warmthProgress.spendableWarmth}
+        onDrawAgain={() => {
+          const res = spendWarmth(5, user?.id);
+          if (res.success) {
+            const updated = getStoredWarmth(user?.id);
+            setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
+          }
         }}
       />
 

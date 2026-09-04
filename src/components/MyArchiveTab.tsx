@@ -21,7 +21,7 @@ import { FailureCard } from './FailureCard';
 import { MoonlightCalendar } from './MoonlightCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { getDeviceId } from '@/lib/device';
-import { calculateWarmthProgress, getStoredWarmth, WarmthProgress } from '@/lib/warmthSystem';
+import { calculateWarmthProgress, getStoredWarmth, getStoredPassStatus, clearStoredPass, WarmthProgress } from '@/lib/warmthSystem';
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
 import { RefundModal } from './RefundModal';
@@ -51,7 +51,7 @@ export function MyArchiveTab({
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [warmthProgress, setWarmthProgress] = useState<WarmthProgress>(() => {
-    const stored = getStoredWarmth();
+    const stored = getStoredWarmth(user?.id);
     return calculateWarmthProgress(stored.lifetime, stored.spendable);
   });
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
@@ -61,28 +61,18 @@ export function MyArchiveTab({
     paymentKey?: string;
     expiresAt?: string;
     purchasedAt?: string;
-  } | null>(null);
+  } | null>(() => getStoredPassStatus(user?.id).passInfo);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const infoStr = localStorage.getItem('logmate_pass_info');
-      if (infoStr) {
-        try {
-          setPassInfo(JSON.parse(infoStr));
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        setPassInfo(null);
-      }
-    }
-  }, [hasPass]);
+    const { passInfo: pInfo } = getStoredPassStatus(user?.id);
+    setPassInfo(pInfo);
+  }, [hasPass, user?.id]);
 
   useEffect(() => {
-    const stored = getStoredWarmth();
+    const stored = getStoredWarmth(user?.id);
     setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     setFailuresState(myFailures);
@@ -508,6 +498,7 @@ export function MyArchiveTab({
         onClose={() => setIsRefundModalOpen(false)}
         passInfo={passInfo}
         onRefundSuccess={() => {
+          clearStoredPass(user?.id);
           setPassInfo(null);
           if (onPassCancelled) onPassCancelled();
         }}

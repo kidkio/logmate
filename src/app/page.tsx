@@ -16,7 +16,7 @@ import { FailureShortsFeed } from '@/components/FailureShortsFeed';
 import { PassPurchaseModal } from '@/components/PassPurchaseModal';
 import { MidnightLoungeTab } from '@/components/MidnightLoungeTab';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { getStoredWarmth } from '@/lib/warmthSystem';
+import { getStoredWarmth, getStoredPassStatus, saveStoredPass, clearStoredPass } from '@/lib/warmthSystem';
 import { Moon, Sparkles } from 'lucide-react';
 
 function MainApp() {
@@ -62,10 +62,8 @@ function MainApp() {
       setIsOnboardingOpen(true);
     }
 
-    const savedPass = localStorage.getItem('logmate_has_pass');
-    if (savedPass === 'true') {
-      setHasPass(true);
-    }
+    const { hasPass: userHasPass } = getStoredPassStatus(user?.id);
+    setHasPass(userHasPass);
 
     // 결제 완료/실패 콜백 처리
     if (typeof window !== 'undefined') {
@@ -73,8 +71,11 @@ function MainApp() {
       const paymentStatus = params.get('payment');
       if (paymentStatus === 'success') {
         const plan = params.get('plan');
+        saveStoredPass({
+          plan: plan || 'month',
+          purchasedAt: new Date().toISOString(),
+        }, user?.id);
         setHasPass(true);
-        localStorage.setItem('logmate_has_pass', 'true');
         const planNames: Record<string, string> = {
           day: '1일 자유 이용권',
           month: '30일 심야 무제한 패스',
@@ -105,8 +106,11 @@ function MainApp() {
   };
 
   const handlePassPurchaseSuccess = () => {
+    saveStoredPass({
+      plan: 'month',
+      purchasedAt: new Date().toISOString(),
+    }, user?.id);
     setHasPass(true);
-    localStorage.setItem('logmate_has_pass', 'true');
   };
 
   // 통계 불러오기
@@ -376,7 +380,10 @@ function MainApp() {
                 onOpenInstallGuide={() => setIsInstallGuideOpen(true)}
                 hasPass={hasPass}
                 onOpenPassModal={() => setIsPassModalOpen(true)}
-                onPassCancelled={() => setHasPass(false)}
+                onPassCancelled={() => {
+                  clearStoredPass(user?.id);
+                  setHasPass(false);
+                }}
               />
             </div>
           )}
@@ -394,7 +401,7 @@ function MainApp() {
           isOpen={isPassModalOpen}
           onClose={() => setIsPassModalOpen(false)}
           onPurchaseSuccess={handlePassPurchaseSuccess}
-          userWarmth={getStoredWarmth().spendable}
+          userWarmth={getStoredWarmth(user?.id).spendable}
           onOpenWarmthShop={() => {
             setIsPassModalOpen(false);
             setActiveTab('lounge');
