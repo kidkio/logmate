@@ -91,8 +91,8 @@ export function LandingAuth() {
         <div className="space-y-4 pt-2 relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-[0_0_20px_rgba(99,102,241,0.4)]">
-                <Moon className="w-5 h-5 fill-white/20" />
+              <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-white/10 flex items-center justify-center flex-shrink-0 bg-slate-900">
+                <img src="/logo.png" alt="LogMate" className="w-full h-full object-cover" />
               </div>
               <div>
                 <span className="text-xs font-black tracking-wider text-indigo-400 uppercase block">

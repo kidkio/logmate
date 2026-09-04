@@ -22,8 +22,8 @@ export function InstallGuideModal({ isOpen, onClose }: InstallGuideModalProps) {
         </button>
 
         <div className="text-center space-y-2 pt-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center mx-auto text-white shadow-lg shadow-indigo-500/20">
-            <Moon className="w-6 h-6" />
+          <div className="w-16 h-16 rounded-3xl overflow-hidden mx-auto shadow-xl shadow-indigo-500/30 border border-white/10 flex items-center justify-center bg-slate-900">
+            <img src="/icons/icon-192x192.png" alt="LogMate App" className="w-full h-full object-cover" />
           </div>
           <h3 className="text-base font-bold text-slate-100">
             LogMate를 홈 화면에 추가하기

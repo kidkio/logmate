@@ -33,8 +33,8 @@ export function Header({
       <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
         {/* 좌측 로고 및 슬림 타이틀 */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20">
-            <Moon className="w-3.5 h-3.5 fill-white/20" />
+          <div className="w-7 h-7 rounded-lg overflow-hidden shadow-sm shadow-indigo-500/30 border border-white/10 flex items-center justify-center flex-shrink-0 bg-slate-900">
+            <img src="/logo.png" alt="LogMate" className="w-full h-full object-cover" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-xs font-black tracking-wider text-indigo-400 uppercase">

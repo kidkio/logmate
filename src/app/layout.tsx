@@ -15,6 +15,15 @@ export const metadata: Metadata = {
     '실패를 털어놓을 가장 다정한 친구, LogMate. 오늘 하루 겪었던 실패를 털어놓고, 비슷한 실패를 경험한 친구들의 위로와 공감을 나눠보세요.',
   keywords: ['LogMate', '로그메이트', '실패공유', '위로', '익명커뮤니티', '이불킥', '공감', '오늘의실패'],
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -24,6 +33,7 @@ export const metadata: Metadata = {
     title: 'LogMate (로그메이트) | 오늘 당신의 실패를 공유하세요',
     description: '실패를 털어놓을 가장 다정한 친구, LogMate. 당신만 그런 것이 아닙니다.',
     type: 'website',
+    images: [{ url: '/icons/icon-512x512.png', width: 512, height: 512, alt: 'LogMate App Logo' }],
   },
 };
 
