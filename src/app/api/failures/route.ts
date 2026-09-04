@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
           similarFailures: similarData.similarFailures,
           categoryCount: similarData.categoryCount,
           aiMessage: existing.aiComfortQuote,
+          aiPeerStory: similarData.aiPeerStory,
         },
         { status: 200 }
       );
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
       category: customCategory && customCategory !== '전체' ? customCategory : analysis.category,
       tags: analysis.tags,
       aiComfortQuote: analysis.aiComfortQuote,
+      aiPeerStory: analysis.aiPeerStory,
       embedding,
     });
 
@@ -118,6 +120,7 @@ export async function POST(req: NextRequest) {
       similarFailures: similarData.similarFailures,
       categoryCount: similarData.categoryCount,
       aiMessage: analysis.aiComfortQuote,
+      aiPeerStory: similarData.aiPeerStory,
     });
   } catch (error: any) {
     console.error('Failed to create failure:', error);

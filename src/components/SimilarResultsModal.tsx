@@ -85,8 +85,34 @@ export function SimilarResultsModal({
 
             <div className="space-y-3">
               {similarFailures.length === 0 ? (
-                <div className="text-center py-6 text-xs text-slate-500 bg-slate-950/40 rounded-xl border border-slate-800">
-                  오늘 이 실패를 처음 털어놓으신 개척자입니다! 🎉
+                <div className="space-y-3">
+                  <div className="text-center py-4 px-3 text-xs text-slate-400 bg-slate-950/40 rounded-xl border border-slate-800">
+                    <p className="font-bold text-slate-200">오늘 이 실패를 처음 털어놓으신 개척자입니다! 🎉</p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      아직 같은 실패를 나눈 이웃 사연이 없지만, AI 이웃이 먼저 깊은 공감 에피소드를 보내왔습니다.
+                    </p>
+                  </div>
+
+                  {result.aiPeerStory && (
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/70 via-purple-950/50 to-slate-900 border border-indigo-500/40 shadow-lg shadow-indigo-950/40 space-y-2.5 text-left">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
+                          <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                          <span>AI 이웃의 공감 에피소드</span>
+                        </div>
+                        <span className="text-[10px] text-indigo-200/80 bg-indigo-950/80 px-2 py-0.5 rounded-full border border-indigo-500/30 font-medium">
+                          가상 이웃의 경험담
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-100 leading-relaxed whitespace-pre-wrap font-sans">
+                        &ldquo;{result.aiPeerStory.content}&rdquo;
+                      </p>
+                      <div className="flex items-center justify-between pt-1 border-t border-white/[0.06] text-[11px] text-slate-400">
+                        <span>{result.aiPeerStory.authorNickname || '비슷한 일을 겪었던 이웃'}</span>
+                        <span className="text-pink-300 font-mono text-[10px]">공감도 98%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 similarFailures.map((item) => (

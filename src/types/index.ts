@@ -43,6 +43,7 @@ export interface Failure {
   category: CategoryType;
   tags: string[];
   aiComfortQuote: string;
+  aiPeerStory?: string; // AI 생성 공감 에피소드
   embedding?: number[];
   reactions: ReactionCounts;
   userReactions?: ReactionType[];
@@ -50,6 +51,7 @@ export interface Failure {
   isBlinded: boolean;
   isSeed?: boolean;
   isOvercome?: boolean; // 극복 완료 여부 🌟
+  isAiGenerated?: boolean; // AI 가상 이웃 사연 여부
   createdAt: string; // ISO 8601
   similarityScore?: number; // 0.0 ~ 1.0 (유사도 검색 시)
 }
@@ -67,6 +69,7 @@ export interface CreateFailureResponse {
   similarFailures: Failure[];
   categoryCount: number;
   aiMessage: string;
+  aiPeerStory?: Failure;
 }
 
 export interface ReactionRequest {

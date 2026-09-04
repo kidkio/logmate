@@ -1,5 +1,6 @@
 import { Failure, CategoryType, ReactionType, ReactionCounts, ComfortNote } from '@/types';
 import { getEmbedding, cosineSimilarity, reviewModerationAI } from './gemini';
+import { calculateKoreanSimilarity, SIMILARITY_MATCH_THRESHOLD } from './koreanSimilarity';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -207,11 +208,12 @@ class FailureStore {
     return newFailure;
   }
 
-  // 실시간 유사 실패 매칭
+  // 실시간 유사 실패 매칭 (한국어 특화 하이브리드 엔진)
   async findSimilar(targetFailure: Failure): Promise<{
     similarCount: number;
     similarFailures: Failure[];
     categoryCount: number;
+    aiPeerStory?: Failure;
   }> {
     await this.init();
     const cutoff = getToday3AMKSTCutoff();
@@ -222,46 +224,71 @@ class FailureStore {
     // 새벽 3시 이후 글 우선 필터링
     let todaysFailures = all.filter((f) => new Date(f.createdAt) >= cutoff);
     if (todaysFailures.length < 3) {
-      // 오늘 등록된 글이 적을 때(콜드 스타트)는 최근 48시간 또는 시드 데이터 포함
+      // 오늘 등록된 글이 적을 때(콜드 스타트)는 전체 DB 사연 포함
       todaysFailures = all;
     }
 
     // 동일 카테고리 오늘 등록 인원 수
     const categoryCount = todaysFailures.filter((f) => f.category === targetFailure.category).length;
 
-    // 코사인 유사도 점수 계산
+    // 한국어 형태소/키워드 Jaccard + 카테고리 가중치 유사도 점수 계산
     const scored = todaysFailures.map((f) => {
-      let score = 0;
-      if (targetFailure.embedding && f.embedding) {
-        score = cosineSimilarity(targetFailure.embedding, f.embedding);
-      } else if (f.category === targetFailure.category) {
-        score = 0.65;
-      }
+      const score = calculateKoreanSimilarity(
+        targetFailure.category,
+        targetFailure.content,
+        targetFailure.tags || [],
+        f.category,
+        f.content,
+        f.tags || []
+      );
       return { failure: f, score };
     });
 
     // 유사도 내림차순 정렬
     scored.sort((a, b) => b.score - a.score);
 
-    // 의미적으로 유사하다고 볼 기준 점수 (>= 0.60)
-    const SIMILAR_THRESHOLD = 0.60;
-    const matched = scored.filter((item) => item.score >= SIMILAR_THRESHOLD);
+    // 의미적으로 진짜 유사하다고 볼 기준 점수 (>= 0.42)
+    const matched = scored.filter((item) => item.score >= SIMILARITY_MATCH_THRESHOLD);
 
-    // 비슷한 실패를 겪은 사람 수 (최소 1명 이상은 공감 카테고리로 보장)
-    const similarCount = Math.max(matched.length, Math.min(categoryCount, 1));
+    let topSimilar: Failure[] = [];
+    let aiPeerStory: Failure | undefined = undefined;
+    let similarCount = 0;
 
-    // 상위 3~5개 추출
-    const topSimilar = (matched.length > 0 ? matched : scored)
-      .slice(0, 4)
-      .map((item) => ({
+    if (matched.length > 0) {
+      // 실제 유사 사연이 존재하는 경우: 상위 최대 4개 추출
+      similarCount = matched.length;
+      topSimilar = matched.slice(0, 4).map((item) => ({
         ...this.enrichWithUserReactions(item.failure, targetFailure.deviceId),
         similarityScore: Math.round(item.score * 100),
       }));
+    } else {
+      // 실제 유사 사연이 없는 경우 (콜드 스타트):
+      // 엉뚱한 글을 노출하지 않고, AI 맞춤 공감 에피소드를 제공
+      if (targetFailure.aiPeerStory) {
+        aiPeerStory = {
+          id: `ai-peer-${targetFailure.id}`,
+          deviceId: 'ai-neighbor',
+          authorNickname: '비슷한 일을 겪은 익명의 이웃 🌿',
+          content: targetFailure.aiPeerStory,
+          category: targetFailure.category,
+          tags: targetFailure.tags || ['공감', '토닥토닥'],
+          aiComfortQuote: '이웃의 따뜻한 공감 이야기',
+          reactions: { comfort: 3, relate: 2, kick: 0, cheer: 1 },
+          reportCount: 0,
+          isBlinded: false,
+          isAiGenerated: true,
+          createdAt: new Date().toISOString(),
+          similarityScore: 98,
+        };
+        similarCount = 1;
+      }
+    }
 
     return {
       similarCount,
       similarFailures: topSimilar,
       categoryCount,
+      aiPeerStory,
     };
   }
 

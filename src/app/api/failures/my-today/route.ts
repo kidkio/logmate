@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
       similarCount: similarData.similarCount,
       similarFailures: similarData.similarFailures,
       categoryCount: similarData.categoryCount,
+      aiPeerStory: similarData.aiPeerStory,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
