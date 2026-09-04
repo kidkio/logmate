@@ -18,17 +18,31 @@ const SLIDES = [
     desc: '성공과 완벽함만 강요받는 세상에서, 누구의 눈치도 보지 않고 나의 서투름을 털어놓을 수 있는 안전한 비밀 공간입니다.',
   },
   {
+    icon: Sparkles,
+    iconColor: 'text-amber-400',
+    iconBg: 'bg-amber-500/20 border-amber-500/30',
+    badge: '사연 피드 미리보기',
+    title: '실패를 털어놓으면\n따뜻한 위로가 도착합니다',
+    desc: '매일 밤, 나와 닮은 고민을 겪은 이웃들의 솔직한 고백과 다정한 위로가 가득 채워집니다.',
+    previewCard: {
+      author: '포근한 다람쥐 #412',
+      content: '오늘 중요한 발표에서 긴장해서 준비한 말을 하나도 못 했어요. 집에 오는 내내 제가 너무 한심해서 눈물이 났습니다...',
+      quote: '“괜찮아요. 그날의 긴장감은 당신이 그만큼 간절히 최선을 다했다는 빛나는 증거입니다.”',
+      warmth: 28,
+    },
+  },
+  {
     icon: Users,
     iconColor: 'text-pink-400',
     iconBg: 'bg-pink-500/20 border-pink-500/30',
-    badge: '당신만 그런 게 아닙니다',
-    title: 'AI가 나와 똑같은 실수를 한\n친구들을 찾아줍니다',
-    desc: '오늘 하루 나 혼자만 바보 같았던 것 같나요? 실패를 적는 순간, 오늘 나와 같은 실수를 겪은 사람들의 수와 위로가 연결됩니다.',
+    badge: '1일 1회 작성 원칙',
+    title: '내 사연을 먼저 적어야\n친구들의 사연이 열립니다',
+    desc: '다른 사람의 글을 눈팅만 하는 공간이 아닌, 서로의 상처를 정직하게 나누는 무균실 안식처입니다. 오늘 나의 실패를 먼저 솔직히 털어놓아 보세요.',
   },
   {
     icon: Clock,
-    iconColor: 'text-amber-400',
-    iconBg: 'bg-amber-500/20 border-amber-500/30',
+    iconColor: 'text-emerald-400',
+    iconBg: 'bg-emerald-500/20 border-emerald-500/30',
     badge: '매일 새벽 3시의 리셋',
     title: '털어놓고 훌훌 털어내면,\n내일은 새하얀 백지입니다',
     desc: '하루에 딱 한 번 진솔하게 털어놓으세요. 악플 없는 다정한 토닥임만 받고, 편안한 마음으로 오늘 밤 숙면을 취하세요.',
@@ -83,24 +97,39 @@ export function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
         </div>
 
         {/* 슬라이드 메인 콘텐츠 */}
-        <div className="py-6 space-y-4 my-auto text-center">
+        <div className="py-4 space-y-3 my-auto text-center">
           <div
-            className={`w-16 h-16 rounded-2xl ${slide.iconBg} border flex items-center justify-center mx-auto shadow-inner`}
+            className={`w-12 h-12 rounded-2xl ${slide.iconBg} border flex items-center justify-center mx-auto shadow-inner`}
           >
-            <IconComponent className={`w-8 h-8 ${slide.iconColor}`} />
+            <IconComponent className={`w-6 h-6 ${slide.iconColor}`} />
           </div>
 
-          <div className="space-y-2">
-            <span className="text-[11px] font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
               {slide.badge}
             </span>
-            <h2 className="text-xl font-bold text-slate-100 whitespace-pre-line leading-snug">
+            <h2 className="text-lg font-bold text-slate-100 whitespace-pre-line leading-snug">
               {slide.title}
             </h2>
             <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
               {slide.desc}
             </p>
           </div>
+
+          {'previewCard' in slide && slide.previewCard && (
+            <div className="mt-1 p-3.5 rounded-2xl bg-black/50 border border-indigo-500/30 text-left space-y-2 shadow-inner text-xs animate-in fade-in">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span className="font-semibold text-indigo-300">👤 {slide.previewCard.author}</span>
+                <span className="text-amber-400 font-bold">🕯️ {slide.previewCard.warmth} 온기</span>
+              </div>
+              <p className="text-slate-200 line-clamp-2 text-[11px] leading-relaxed">
+                &ldquo;{slide.previewCard.content}&rdquo;
+              </p>
+              <div className="p-2 rounded-xl bg-indigo-950/50 border border-indigo-500/20 text-[10px] text-indigo-300 italic">
+                {slide.previewCard.quote}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 하단 버튼 및 안심 문구 */}

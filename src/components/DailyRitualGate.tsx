@@ -1,15 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon, BookOpen } from 'lucide-react';
+import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { CreateFailureResponse } from '@/types';
 import { getDeviceId } from '@/lib/device';
 
 interface DailyRitualGateProps {
   onSuccess: (result: CreateFailureResponse) => void;
-  onExploreAnyway?: () => void;
-  onBrowseShorts?: () => void;
 }
 
 const INSPIRATION_CHIPS = [
@@ -21,7 +19,7 @@ const INSPIRATION_CHIPS = [
   '이불킥 🛌',
 ];
 
-export function DailyRitualGate({ onSuccess, onBrowseShorts }: DailyRitualGateProps) {
+export function DailyRitualGate({ onSuccess }: DailyRitualGateProps) {
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -179,17 +177,6 @@ export function DailyRitualGate({ onSuccess, onBrowseShorts }: DailyRitualGatePr
               </>
             )}
           </button>
-
-          {onBrowseShorts && (
-            <button
-              type="button"
-              onClick={onBrowseShorts}
-              className="w-full py-2.5 rounded-xl font-bold text-xs text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.08] active:scale-[0.98] flex items-center justify-center gap-1.5 transition-all"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-              <span>📖 이웃들의 사연 피드 먼저 둘러보기</span>
-            </button>
-          )}
         </form>
       </div>
 

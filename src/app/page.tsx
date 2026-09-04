@@ -38,7 +38,6 @@ function MainApp() {
   // 무제한 이용권 보유 여부
   const [hasPass, setHasPass] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
-  const [isBrowsingShorts, setIsBrowsingShorts] = useState(false);
   const [isTodayStatusChecked, setIsTodayStatusChecked] = useState(false);
 
   // 모달 상태
@@ -344,15 +343,13 @@ function MainApp() {
                   <div className="w-7 h-7 rounded-full border-2 border-indigo-500/30 border-t-indigo-400 animate-spin" />
                   <span className="text-xs font-medium text-slate-400">오늘의 안식처 상태 확인 중...</span>
                 </div>
-              ) : !myTodayFailure && !isBrowsingShorts ? (
-                /* 아직 작성하지 않았고 숏츠 둘러보기를 누르지 않았으면: 털어놓기 게이트 표시 */
+              ) : !myTodayFailure ? (
+                /* 오늘 아직 사연을 작성하지 않았으면: 털어놓기 게이트 표시 (필수 작성 원칙) */
                 <DailyRitualGate
                   onSuccess={handleSuccessCreate}
-                  onExploreAnyway={() => setActiveTab('lounge')}
-                  onBrowseShorts={() => setIsBrowsingShorts(true)}
                 />
               ) : (
-                /* 작성 완료 또는 숏츠 둘러보기 시: 숏츠 뷰 */
+                /* 오늘 사연 작성 완료 시: 나와 닮은 사연 및 숏츠 피드 잠금 해제 */
                 <FailureShortsFeed
                   similarFailures={todaySimilarFailures}
                   otherFailures={failures}
@@ -363,7 +360,6 @@ function MainApp() {
                   hasPass={hasPass}
                   onOpenPassModal={() => setIsPassModalOpen(true)}
                   onNavigateTab={(tab) => setActiveTab(tab)}
-                  onOpenWriteGate={() => setIsBrowsingShorts(false)}
                 />
               )}
             </div>

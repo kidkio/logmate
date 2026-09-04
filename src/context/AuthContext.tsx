@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
+import { initNewUserWarmth, cleanupLegacyStorageKeys } from '@/lib/warmthSystem';
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function checkAuth() {
       try {
+        cleanupLegacyStorageKeys();
         // 소셜 로그인 리다이렉트 후 전달된 토큰 파라미터 확인
         if (typeof window !== 'undefined') {
           const urlParams = new URLSearchParams(window.location.search);
@@ -129,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('logmate_token', data.token);
       }
       localStorage.setItem('logmate_just_signed_up', 'true');
+      initNewUserWarmth(data.user.id);
       setUser(data.user);
       localStorage.setItem('logmate_user', JSON.stringify(data.user));
       setIsLoading(false);
@@ -174,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: 'guest',
       createdAt: new Date().toISOString(),
     };
+    initNewUserWarmth(guestUser.id);
     setUser(guestUser);
     localStorage.setItem('logmate_user', JSON.stringify(guestUser));
     setIsLoading(false);
@@ -186,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error(err);
     }
+    cleanupLegacyStorageKeys();
     localStorage.removeItem('logmate_user');
     localStorage.removeItem('logmate_token');
     setUser(null);

@@ -387,20 +387,8 @@ export function getStoredWarmth(customUserId?: string | null): { spendable: numb
   const spendableKey = getUserScopedKey(STORAGE_SPENDABLE, uid);
   const lifetimeKey = getUserScopedKey(STORAGE_LIFETIME, uid);
 
-  let spendableStr = localStorage.getItem(spendableKey);
-  let lifetimeStr = localStorage.getItem(lifetimeKey);
-
-  // 마이그레이션: 해당 유저의 키가 비어있고 구버전 단일 키가 있으면 1회 복사
-  if (!spendableStr && !lifetimeStr && uid) {
-    const legacySpendable = localStorage.getItem(STORAGE_SPENDABLE);
-    const legacyLifetime = localStorage.getItem(STORAGE_LIFETIME);
-    if (legacySpendable || legacyLifetime) {
-      spendableStr = legacySpendable;
-      lifetimeStr = legacyLifetime;
-      localStorage.setItem(spendableKey, spendableStr || '0');
-      localStorage.setItem(lifetimeKey, lifetimeStr || '0');
-    }
-  }
+  const spendableStr = localStorage.getItem(spendableKey);
+  const lifetimeStr = localStorage.getItem(lifetimeKey);
 
   const spendable = spendableStr ? parseInt(spendableStr, 10) : 0;
   const lifetime = lifetimeStr ? parseInt(lifetimeStr, 10) : Math.max(spendable, 0);
@@ -534,20 +522,8 @@ export function getStoredPassStatus(customUserId?: string | null): { hasPass: bo
   const hasPassKey = getUserScopedKey('logmate_has_pass', uid);
   const passInfoKey = getUserScopedKey('logmate_pass_info', uid);
 
-  let hasPass = localStorage.getItem(hasPassKey) === 'true';
-  let passInfoStr = localStorage.getItem(passInfoKey);
-
-  // 마이그레이션: 글로벌 키가 있으면 유저 키로 복사
-  if (!hasPass && !passInfoStr && uid) {
-    const legacyPass = localStorage.getItem('logmate_has_pass');
-    const legacyInfo = localStorage.getItem('logmate_pass_info');
-    if (legacyPass === 'true') {
-      hasPass = true;
-      passInfoStr = legacyInfo;
-      localStorage.setItem(hasPassKey, 'true');
-      if (passInfoStr) localStorage.setItem(passInfoKey, passInfoStr);
-    }
-  }
+  const hasPass = localStorage.getItem(hasPassKey) === 'true';
+  const passInfoStr = localStorage.getItem(passInfoKey);
 
   let passInfo = null;
   if (passInfoStr) {
@@ -567,8 +543,6 @@ export function saveStoredPass(passInfo: any, customUserId?: string | null) {
 
   localStorage.setItem(hasPassKey, 'true');
   localStorage.setItem(passInfoKey, JSON.stringify(passInfo));
-  localStorage.setItem('logmate_has_pass', 'true');
-  localStorage.setItem('logmate_pass_info', JSON.stringify(passInfo));
 }
 
 export function clearStoredPass(customUserId?: string | null) {
@@ -579,6 +553,43 @@ export function clearStoredPass(customUserId?: string | null) {
 
   localStorage.removeItem(hasPassKey);
   localStorage.removeItem(passInfoKey);
-  localStorage.removeItem('logmate_has_pass');
-  localStorage.removeItem('logmate_pass_info');
+}
+
+// 신규 회원 및 게스트 입장 시 초기화 (0 레벨, 0 온기 보장)
+export function initNewUserWarmth(userId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const spendableKey = getUserScopedKey(STORAGE_SPENDABLE, userId);
+    const lifetimeKey = getUserScopedKey(STORAGE_LIFETIME, userId);
+    const energyKey = getUserScopedKey(STORAGE_CYCLE_ENERGY, userId);
+    const cooldownKey = getUserScopedKey(STORAGE_COOLDOWN_UNTIL, userId);
+    const boosterKey = getUserScopedKey(STORAGE_BOOSTER_UNTIL, userId);
+    const hasPassKey = getUserScopedKey('logmate_has_pass', userId);
+    const passInfoKey = getUserScopedKey('logmate_pass_info', userId);
+
+    localStorage.setItem(spendableKey, '0');
+    localStorage.setItem(lifetimeKey, '0');
+    localStorage.setItem(energyKey, '0');
+    localStorage.setItem(cooldownKey, '0');
+    localStorage.setItem(boosterKey, '0');
+    localStorage.removeItem(hasPassKey);
+    localStorage.removeItem(passInfoKey);
+  } catch {}
+}
+
+// 브라우저에 남아있을 수 있는 구버전 단일 글로벌 키 완전 삭제
+export function cleanupLegacyStorageKeys(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('logmate_user_warmth');
+    localStorage.removeItem('logmate_lifetime_warmth');
+    localStorage.removeItem('logmate_warmth_cycle_energy');
+    localStorage.removeItem('logmate_warmth_cooldown_until');
+    localStorage.removeItem('logmate_warmth_booster_until');
+    localStorage.removeItem('logmate_warmth_booster_multiplier');
+    localStorage.removeItem('logmate_has_pass');
+    localStorage.removeItem('logmate_pass_info');
+    localStorage.removeItem('logmate_user_warmth_guest');
+    localStorage.removeItem('logmate_lifetime_warmth_guest');
+  } catch {}
 }

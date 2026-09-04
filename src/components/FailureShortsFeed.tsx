@@ -707,7 +707,12 @@ export function FailureShortsFeed({
                     </div>
 
                     <div className="space-y-2 pt-1">
-                      {onOpenWriteGate && (
+                      {myTodayFailure ? (
+                        <div className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 flex items-center justify-center gap-2">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>오늘의 털어놓기 리추얼 완료 ✨</span>
+                        </div>
+                      ) : onOpenWriteGate ? (
                         <button
                           onClick={onOpenWriteGate}
                           className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg flex items-center justify-center gap-2 active:scale-98"
@@ -715,7 +720,7 @@ export function FailureShortsFeed({
                           <PenLine className="w-3.5 h-3.5" />
                           <span>오늘의 실패 털어놓기</span>
                         </button>
-                      )}
+                      ) : null}
                       <button
                         onClick={() => onNavigateTab?.('lounge')}
                         className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-white/[0.05] text-slate-300 border border-white/[0.08] flex items-center justify-center gap-2"
