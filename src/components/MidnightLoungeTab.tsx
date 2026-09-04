@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Flame, Sparkles, Volume2, VolumeX, Moon, Heart, Send, Waves, Wind, CloudRain, Clock, ThermometerSun, ExternalLink, Sliders, Target, Trophy, Compass, Star, TrendingUp } from 'lucide-react';
 import { soundscape, SOUND_CHANNELS, SOUND_PRESETS, SoundChannel, SoundPreset } from '@/lib/soundscape';
-import { User } from '@/types';
+import { User, Failure, ReactionType } from '@/types';
 import { RewardedAdModal } from './RewardedAdModal';
 import { Toast } from './Toast';
 import { WarmthShopModal } from './WarmthShopModal';
@@ -24,6 +24,7 @@ import {
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
 import { TarotModal } from './TarotModal';
+import { UnlockedSimilarModal } from './UnlockedSimilarModal';
 
 export interface WarmthEvent {
   id: string;
@@ -44,6 +45,7 @@ interface WhisperItem {
 interface MidnightLoungeTabProps {
   user: User | null;
   deviceId: string;
+  onNavigateTab?: (tab: 'today' | 'lounge' | 'archive') => void;
 }
 
 interface FloatingSpark {
@@ -56,7 +58,7 @@ interface FloatingSpark {
   delay: number;
 }
 
-export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
+export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLoungeTabProps) {
   const [activeCount, setActiveCount] = useState(1);
   const [candleCount, setCandleCount] = useState(1280);
   const [whispers, setWhispers] = useState<WhisperItem[]>([]);
@@ -68,6 +70,10 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   const [isRewardedAdOpen, setIsRewardedAdOpen] = useState(false);
   const [isWarmthShopOpen, setIsWarmthShopOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 온기로 해금된 숨겨진 공감 사연 3편 상태
+  const [unlockedFailures, setUnlockedFailures] = useState<Failure[]>([]);
+  const [isUnlockedModalOpen, setIsUnlockedModalOpen] = useState(false);
 
   // 온기 레벨 & 진척도 상태
   const [warmthProgress, setWarmthProgress] = useState<WarmthProgress>(() => {
@@ -1203,14 +1209,36 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           setIsWarmthShopOpen(false);
           setIsTarotModalOpen(true);
         }}
-        onRedeemSimilar={() => {
+        onRedeemSimilar={async () => {
           const res = spendWarmth(WARMTH_SHOP_PRICES.SIMILAR_UNLOCK, user?.id);
           if (!res.success) return;
           const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
-          setToastMessage('🔓 숨겨진 공감 사연 3편이 즉시 잠금 해제되었습니다!');
-          setTimeout(() => setToastMessage(null), 3000);
           setIsWarmthShopOpen(false);
+
+          // 실제 숨겨진 공감 사연 3편 즉시 로드
+          try {
+            const params = new URLSearchParams();
+            if (deviceId) params.set('deviceId', deviceId);
+            if (user?.id) params.set('userId', user.id);
+
+            const apiRes = await fetch(`/api/failures/unlocked-similar?${params.toString()}`);
+            const data = await apiRes.json();
+            if (data.success && data.unlockedFailures && data.unlockedFailures.length > 0) {
+              setUnlockedFailures(data.unlockedFailures);
+              setIsUnlockedModalOpen(true);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('logmate_unlocked_stories', JSON.stringify(data.unlockedFailures));
+              }
+              setToastMessage('🔓 숨겨진 공감 사연 3편이 성공적으로 해금되었습니다!');
+            } else {
+              setToastMessage('🔓 숨겨진 공감 사연 3편이 잠금 해제되었습니다!');
+            }
+          } catch (e) {
+            console.error('Failed to fetch unlocked stories:', e);
+            setToastMessage('🔓 숨겨진 공감 사연 3편이 잠금 해제되었습니다!');
+          }
+          setTimeout(() => setToastMessage(null), 3500);
         }}
         onRedeemNotePack={() => {
           const res = spendWarmth(WARMTH_SHOP_PRICES.NOTE_PACK_3, user?.id);
@@ -1269,7 +1297,19 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         onOpenBooster={() => setIsRewardedAdOpen(true)}
       />
 
-      {/* 8. 알림 토스트 */}
+      {/* 9. 온기 해금 숨겨진 공감 사연 3편 전용 모달 */}
+      <UnlockedSimilarModal
+        isOpen={isUnlockedModalOpen}
+        onClose={() => setIsUnlockedModalOpen(false)}
+        unlockedFailures={unlockedFailures}
+        onNavigateToFeed={() => {
+          if (onNavigateTab) {
+            onNavigateTab('today');
+          }
+        }}
+      />
+
+      {/* 10. 알림 토스트 */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );

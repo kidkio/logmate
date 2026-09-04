@@ -366,7 +366,11 @@ function MainApp() {
           )}
 
           {activeTab === 'lounge' && (
-            <MidnightLoungeTab user={user} deviceId={deviceId} />
+            <MidnightLoungeTab 
+              user={user} 
+              deviceId={deviceId} 
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
           )}
 
           {activeTab === 'archive' && (

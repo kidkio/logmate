@@ -25,7 +25,7 @@ import {
   LockOpen
 } from 'lucide-react';
 import { SendComfortNoteModal } from './SendComfortNoteModal';
-
+import { UnlockedSimilarModal } from './UnlockedSimilarModal';
 import { RewardedAdModal } from './RewardedAdModal';
 import { Toast } from './Toast';
 
@@ -104,6 +104,7 @@ const COUPANG_AFFILIATE_PRODUCTS: CoupangProduct[] = [
 
 type FeedItem =
   | { type: 'similar'; failure: Failure; rank: number }
+  | { type: 'unlocked_bonus'; failure: Failure; rank: number }
   | { type: 'similar_exhausted'; count: number }
   | { type: 'ad_adsense' }
   | { type: 'ad_coupang'; product: CoupangProduct }
@@ -155,18 +156,41 @@ export function FailureShortsFeed({
   onNavigateTab,
   onOpenWriteGate,
 }: FailureShortsFeedProps) {
+  // 온기/리워드로 해금된 보너스 공감 사연 3편 상태
+  const [unlockedBonusFailures, setUnlockedBonusFailures] = useState<Failure[]>([]);
+  const [isUnlockedModalOpen, setIsUnlockedModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('logmate_unlocked_stories');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setUnlockedBonusFailures(parsed);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse unlocked stories:', e);
+      }
+    }
+  }, []);
+
   // 1. 알고리즘 기반 피드 구성
   const topSimilar = similarFailures.slice(0, 3);
   const others = otherFailures.filter(
-    (f) => (!myTodayFailure || f.id !== myTodayFailure.id) && !topSimilar.some((sf) => sf.id === f.id)
+    (f) =>
+      (!myTodayFailure || f.id !== myTodayFailure.id) &&
+      !topSimilar.some((sf) => sf.id === f.id) &&
+      !unlockedBonusFailures.some((ub) => ub.id === f.id)
   );
 
   const items: FeedItem[] = [];
 
-  if (topSimilar.length === 0 && others.length === 0) {
+  if (topSimilar.length === 0 && others.length === 0 && unlockedBonusFailures.length === 0) {
     items.push({ type: 'empty' });
   } else {
-    // [단계 1] 나와 가장 닮은 상위 사연 (최대 3편)
+    // [단계 1] 나와 가장 닮은 상위 사연 (기본 3편)
     topSimilar.forEach((failure, idx) => {
       items.push({
         type: 'similar',
@@ -175,16 +199,25 @@ export function FailureShortsFeed({
       });
     });
 
+    // [단계 1-2] 온기/광고로 잠금 해제된 숨겨진 공감 사연 (추가 3편)
+    unlockedBonusFailures.forEach((failure, idx) => {
+      items.push({
+        type: 'unlocked_bonus',
+        failure,
+        rank: idx + 1,
+      });
+    });
+
     // [단계 2] 유사 사연 3종 직후 광고 (패스 미보유 시): 구글 애드센스 네이티브 인피드
-    if (!hasPass && topSimilar.length > 0) {
+    if (!hasPass && (topSimilar.length > 0 || unlockedBonusFailures.length > 0)) {
       items.push({ type: 'ad_adsense' });
     }
 
     // [단계 3] 비슷한 사연 소진 알림 및 라운지/캘린더 유도 전환 카드!
-    if (topSimilar.length > 0) {
+    if (topSimilar.length > 0 || unlockedBonusFailures.length > 0) {
       items.push({
         type: 'similar_exhausted',
-        count: topSimilar.length,
+        count: topSimilar.length + unlockedBonusFailures.length,
       });
     }
 
@@ -272,6 +305,11 @@ export function FailureShortsFeed({
               <Sparkles className="w-3 h-3 text-pink-400" />
               <span>나와 닮은 사연 {items[activeIndex].rank}위</span>
             </span>
+          ) : items[activeIndex]?.type === 'unlocked_bonus' ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/70 backdrop-blur-md border border-amber-500/50 px-2.5 py-0.5 rounded-full shadow-lg animate-pulse">
+              <LockOpen className="w-3 h-3 text-amber-400" />
+              <span>온기로 해금된 비밀 사연 {items[activeIndex].rank}번째</span>
+            </span>
           ) : items[activeIndex]?.type === 'similar_exhausted' ? (
             <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-black/70 backdrop-blur-md border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
               <Flame className="w-3 h-3 text-amber-400" />
@@ -344,8 +382,8 @@ export function FailureShortsFeed({
               {/* 앰비언트 글로우 배경 효과 */}
               <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-              {/* [카드 타입 A: 실패 사연 숏츠 (유사 사연 또는 커뮤니티)] */}
-              {item.type === 'similar' || item.type === 'community' ? (
+              {/* [카드 타입 A: 실패 사연 숏츠 (유사 사연, 온기 해금 사연 또는 커뮤니티)] */}
+              {item.type === 'similar' || item.type === 'community' || item.type === 'unlocked_bonus' ? (
                 <div className="w-full h-full flex flex-col justify-between pt-7 pb-2 relative z-10">
                   {/* 상단 태그 및 작성자 정보 */}
                   <div className="flex items-center justify-between gap-2 flex-shrink-0">
@@ -356,6 +394,13 @@ export function FailureShortsFeed({
                           {item.rank === 2 && <Medal className="w-3 h-3 text-slate-300" />}
                           {item.rank === 3 && <Award className="w-3 h-3 text-amber-500" />}
                           <span>유사 실패 {item.rank}위</span>
+                        </span>
+                      )}
+
+                      {item.type === 'unlocked_bonus' && (
+                        <span className="text-[11px] font-black text-white bg-gradient-to-r from-amber-500 to-pink-600 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.5)] flex items-center gap-1 animate-pulse">
+                          <LockOpen className="w-3 h-3 text-amber-200" />
+                          <span>해금된 비밀 사연 {item.rank}번째</span>
                         </span>
                       )}
 
@@ -772,13 +817,40 @@ export function FailureShortsFeed({
         isOpen={isRewardedAdOpen}
         onClose={() => setIsRewardedAdOpen(false)}
         rewardType="similar_failures"
-        onRewardClaimed={() => {
-          setToastMessage('🎉 보상 획득! 숨겨진 공감 사연 3편이 열렸습니다 🔓');
-          setTimeout(() => setToastMessage(null), 3000);
+        onRewardClaimed={async () => {
+          try {
+            const params = new URLSearchParams();
+            if (myTodayFailure?.deviceId) params.set('deviceId', myTodayFailure.deviceId);
+            if (myTodayFailure?.userId) params.set('userId', myTodayFailure.userId);
+            const res = await fetch(`/api/failures/unlocked-similar?${params.toString()}`);
+            const data = await res.json();
+            if (data.success && data.unlockedFailures?.length > 0) {
+              setUnlockedBonusFailures(data.unlockedFailures);
+              setIsUnlockedModalOpen(true);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('logmate_unlocked_stories', JSON.stringify(data.unlockedFailures));
+              }
+              setToastMessage('🎉 보상 획득! 숨겨진 공감 사연 3편이 즉시 열렸습니다 🔓');
+            } else {
+              setToastMessage('🎉 보상 획득! 추가 사연을 불러왔습니다.');
+            }
+          } catch (e) {
+            console.error(e);
+            setToastMessage('🎉 보상 획득 완료!');
+          }
+          setTimeout(() => setToastMessage(null), 3500);
         }}
       />
 
-      {/* 6. 알림 토스트 */}
+      {/* 6. 온기/광고로 해금된 사연 전용 뷰어 모달 */}
+      <UnlockedSimilarModal
+        isOpen={isUnlockedModalOpen}
+        onClose={() => setIsUnlockedModalOpen(false)}
+        unlockedFailures={unlockedBonusFailures}
+        onReaction={onReaction}
+      />
+
+      {/* 7. 알림 토스트 */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
