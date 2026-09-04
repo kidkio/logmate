@@ -82,7 +82,9 @@ async function readUsers(): Promise<UserRecord[]> {
 
 async function writeUsers(users: UserRecord[]): Promise<void> {
   await ensureFiles();
-  await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
+  const tmpPath = `${USERS_FILE}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 7)}`;
+  await fs.writeFile(tmpPath, JSON.stringify(users, null, 2), 'utf-8');
+  await fs.rename(tmpPath, USERS_FILE);
 }
 
 async function readSessions(): Promise<SessionRecord[]> {
@@ -97,7 +99,9 @@ async function readSessions(): Promise<SessionRecord[]> {
 
 async function writeSessions(sessions: SessionRecord[]): Promise<void> {
   await ensureFiles();
-  await fs.writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2), 'utf-8');
+  const tmpPath = `${SESSIONS_FILE}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 7)}`;
+  await fs.writeFile(tmpPath, JSON.stringify(sessions, null, 2), 'utf-8');
+  await fs.rename(tmpPath, SESSIONS_FILE);
 }
 
 export async function getUserByEmail(email: string): Promise<UserRecord | null> {

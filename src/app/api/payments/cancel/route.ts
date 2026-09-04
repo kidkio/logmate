@@ -1,17 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { paymentStore } from '@/lib/payment-store';
+import { getUserBySession } from '@/lib/user-store';
 
 const DEFAULT_TEST_SECRET_KEY = 'test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { paymentKey, cancelReason } = body;
+    const { paymentKey, cancelReason, deviceId } = body;
 
     if (!paymentKey) {
       return NextResponse.json(
         { success: false, message: '결제 키(paymentKey)가 필요합니다.' },
         { status: 400 }
       );
+    }
+
+    // 세션 토큰 확인 (로그인 사용자 식별)
+    let userId: string | undefined;
+    const token = request.cookies.get('logmate_token')?.value || request.headers.get('authorization')?.replace('Bearer ', '');
+    if (token) {
+      const user = await getUserBySession(token);
+      if (user) userId = user.id;
+    }
+
+    // 서버 저장소에 등록된 주문 내역 조회 및 권한 검증
+    const order = await paymentStore.getOrderByPaymentKey(paymentKey);
+    if (order) {
+      if (order.status === 'CANCELED') {
+        return NextResponse.json(
+          { success: false, message: '이미 취소/환불 완료된 결제 건입니다.' },
+          { status: 400 }
+        );
+      }
+
+      // 주문 소유권 검증 (회원 주문인 경우 본인 세션과 일치해야 함)
+      if (order.userId && order.userId !== userId) {
+        return NextResponse.json(
+          { success: false, message: '본인의 결제 건만 환불을 요청할 수 있습니다.' },
+          { status: 403 }
+        );
+      }
+
+      // 게스트 주문인 경우 기기 식별자 검증
+      if (!order.userId && order.deviceId && deviceId && order.deviceId !== deviceId) {
+        return NextResponse.json(
+          { success: false, message: '결제 기기와 일치하지 않아 취소할 수 없습니다.' },
+          { status: 403 }
+        );
+      }
+
+      // 7일 환불 가능 기간 확인
+      const purchaseTime = new Date(order.purchasedAt).getTime();
+      if (Date.now() - purchaseTime > 7 * 24 * 60 * 60 * 1000) {
+        return NextResponse.json(
+          { success: false, message: '전자상거래법상 결제일로부터 7일이 경과하여 환불이 불가합니다.' },
+          { status: 400 }
+        );
+      }
     }
 
     const secretKey = process.env.TOSS_SECRET_KEY || DEFAULT_TEST_SECRET_KEY;
@@ -38,6 +84,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // 서버 저장소에 취소 상태 기록
+    await paymentStore.cancelOrder(paymentKey, cancelReason || '고객 요청에 의한 환불');
 
     // 쿠키에서 pass 상태 만료 처리
     const res = NextResponse.json({

@@ -11,10 +11,11 @@ export async function GET(req: NextRequest) {
     const category = (searchParams.get('category') as CategoryType) || '전체';
     const sort = (searchParams.get('sort') as 'latest' | 'popular') || 'latest';
     const deviceId = searchParams.get('deviceId') || undefined;
-    let userId = searchParams.get('userId') || undefined;
 
-    const token = req.cookies.get('logmate_token')?.value;
-    if (token && !userId) {
+    // 세션 쿠키를 통해 요청자 식별 (임의의 searchParams userId 조작 방지)
+    let userId: string | undefined;
+    const token = req.cookies.get('logmate_token')?.value || req.headers.get('authorization')?.replace('Bearer ', '');
+    if (token) {
       const user = await getUserBySession(token);
       if (user) userId = user.id;
     }
@@ -42,12 +43,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { content, deviceId, category: customCategory } = body;
-    let userId = body.userId;
     const authorNickname = body.authorNickname;
 
-    // 세션 쿠키에서도 userId 확인
+    // 작성자 식별: 클라이언트 요청 본문의 userId는 절대 신뢰하지 않고 오직 세션 토큰으로만 확인
+    let userId: string | undefined;
     const token = req.cookies.get('logmate_token')?.value || req.headers.get('authorization')?.replace('Bearer ', '');
-    if (token && !userId) {
+    if (token) {
       const user = await getUserBySession(token);
       if (user) userId = user.id;
     }

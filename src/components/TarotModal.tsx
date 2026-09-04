@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Sparkles, RefreshCw, Heart } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, RefreshCw } from 'lucide-react';
 import { WARMTH_SHOP_PRICES } from '@/lib/warmthSystem';
 
 interface TarotCard {
@@ -87,20 +87,22 @@ export function TarotModal({
   const [currentCard, setCurrentCard] = useState<TarotCard>(TAROT_DECK[0]);
   const [isFlipping, setIsFlipping] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      drawRandomCard();
-    }
-  }, [isOpen]);
-
-  const drawRandomCard = () => {
+  const drawRandomCard = useCallback(() => {
     setIsFlipping(true);
     setTimeout(() => {
       const randomIdx = Math.floor(Math.random() * TAROT_DECK.length);
       setCurrentCard(TAROT_DECK[randomIdx]);
       setIsFlipping(false);
     }, 400);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const timeout = setTimeout(() => {
+      drawRandomCard();
+    }, 10);
+    return () => clearTimeout(timeout);
+  }, [isOpen, drawRandomCard]);
 
   if (!isOpen) return null;
 

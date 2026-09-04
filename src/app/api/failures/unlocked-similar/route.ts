@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     );
 
     let unlocked: Failure[] = [];
+    let freeTop3Ids = new Set<string>();
 
     if (todayFailure) {
       // 무료 기본 3편의 ID 추출 (이미 무료로 피드에 노출된 상위 3편)
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
         ),
       }));
       allScored.sort((a, b) => b.score - a.score);
-      const freeTop3Ids = new Set(allScored.slice(0, 3).map((item) => item.failure.id));
+      freeTop3Ids = new Set(allScored.slice(0, 3).map((item) => item.failure.id));
 
       // 남은 후보 사연 중에서 유사도 높은 순으로 신규 3편 추출
       const candidates = available
@@ -93,11 +94,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 여전히 3개 미만인 경우 (전체 풀에서 충원)
+    // 여전히 3개 미만인 경우 (전체 풀에서 충원 - 무료 상위 3편 및 기 해금 사연 절대 제외)
     if (unlocked.length < 3) {
       const currentPickedIds = new Set([
         ...(todayFailure ? [todayFailure.id] : []),
         ...excludedIdSet,
+        ...freeTop3Ids,
         ...unlocked.map((u) => u.id),
       ]);
       const generalFillers = available.filter((f) => !currentPickedIds.has(f.id));
@@ -113,8 +115,9 @@ export async function GET(req: NextRequest) {
       unlockedFailures: unlocked.slice(0, 3),
       basedOnTodayFailure: !!todayFailure,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to get unlocked similar failures:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const message = error instanceof Error ? error.message : '해금 사연 조회에 실패했습니다.';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

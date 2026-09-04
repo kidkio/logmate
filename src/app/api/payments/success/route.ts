@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { paymentStore } from '@/lib/payment-store';
+import { getUserBySession } from '@/lib/user-store';
 
 const DEFAULT_TEST_SECRET_KEY = 'test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R';
 
@@ -53,44 +55,39 @@ export async function GET(request: NextRequest) {
 
     const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 
-    // 클라이언트 브라우저에 pass 상태를 안전하게 전달하기 위한 HTML 응답
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>LogMate 결제 완료</title>
-        </head>
-        <body style="background:#020617;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-          <div style="text-align:center;">
-            <h2>🎉 결제가 성공적으로 완료되었습니다!</h2>
-            <p style="color:#94a3b8;font-size:14px;">프리미엄 혜택을 적용하여 안식처로 이동합니다...</p>
-          </div>
-          <script>
-            try {
-              localStorage.setItem('logmate_has_pass', 'true');
-              localStorage.setItem('logmate_pass_info', JSON.stringify({
-                plan: '${plan}',
-                orderId: '${orderId}',
-                paymentKey: '${paymentKey}',
-                expiresAt: '${expiresAt}',
-                purchasedAt: '${new Date().toISOString()}'
-              }));
-              document.cookie = 'logmate_has_pass=true; path=/; max-age=${durationDays * 24 * 60 * 60}';
-            } catch (e) {
-              console.error(e);
-            }
-            window.location.href = '/?payment=success&plan=${plan}';
-          </script>
-        </body>
-      </html>
-    `;
+    // 세션 쿠키에서 사용자 식별
+    let userId: string | undefined;
+    const token = request.cookies.get('logmate_token')?.value;
+    if (token) {
+      const user = await getUserBySession(token);
+      if (user) userId = user.id;
+    }
 
-    return new NextResponse(html, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-      },
+    // 1. 서버 결제 저장소에 주문 정보 영구 기록
+    await paymentStore.saveOrder({
+      orderId,
+      paymentKey,
+      amount: Number(amount),
+      plan: plan as 'day' | 'month' | 'lifetime',
+      userId,
+      status: 'DONE',
+      expiresAt,
+      purchasedAt: new Date().toISOString(),
     });
+
+    // 2. 안전한 HTTP 리다이렉트 및 패스 쿠키 설정 (인라인 스크립트 XSS 위험 원천 제거)
+    const isSecure = appUrl.startsWith('https:');
+    const redirectUrl = new URL(`/?payment=success&plan=${encodeURIComponent(plan)}`, appUrl);
+    const redirectRes = NextResponse.redirect(redirectUrl);
+
+    redirectRes.cookies.set('logmate_has_pass', 'true', {
+      path: '/',
+      maxAge: durationDays * 24 * 60 * 60,
+      sameSite: 'lax',
+      secure: isSecure,
+    });
+
+    return redirectRes;
   } catch (error) {
     console.error('Payment confirm failed:', error);
     return NextResponse.redirect(`${appUrl}/?payment=fail&message=결제+승인+연결+실패`);

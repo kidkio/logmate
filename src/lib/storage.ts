@@ -1,5 +1,5 @@
 import { Failure, CategoryType, ReactionType, ReactionCounts, ComfortNote } from '@/types';
-import { getEmbedding, cosineSimilarity, reviewModerationAI } from './gemini';
+import { reviewModerationAI } from './gemini';
 import { calculateKoreanSimilarity, SIMILARITY_MATCH_THRESHOLD } from './koreanSimilarity';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs/promises';
@@ -33,11 +33,13 @@ export function getToday3AMKSTCutoff(): Date {
 
 // 사연 소유권 판별 (게스트와 정식 회원 계정 간의 사연 유출 철저 차단 및 작성자 본인 식별)
 export function isFailureOwnedBy(f: Failure, deviceId?: string, userId?: string): boolean {
-  if (userId && f.userId && f.userId === userId) {
-    return true;
+  if (userId) {
+    // 회원 사용자의 경우: 오직 본인의 userId와 일치하는 글만 본인 소유로 판별
+    return Boolean(f.userId && f.userId === userId);
   }
-  if (deviceId && f.deviceId && f.deviceId === deviceId) {
-    return true;
+  if (deviceId) {
+    // 비로그인 게스트의 경우: 회원에게 귀속되지 않은 순수 게스트 글(!f.userId) 중 기기 식별자가 일치하는 글만 판별
+    return Boolean(!f.userId && f.deviceId && f.deviceId === deviceId);
   }
   return false;
 }
@@ -76,7 +78,9 @@ class FailureStore {
     try {
       await fs.mkdir(path.dirname(FAILURES_DATA_PATH), { recursive: true });
       const list = Array.from(this.failures.values()).filter((f) => !f.isSeed && !f.id.startsWith('seed-'));
-      await fs.writeFile(FAILURES_DATA_PATH, JSON.stringify(list, null, 2), 'utf-8');
+      const tmpPath = `${FAILURES_DATA_PATH}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 7)}`;
+      await fs.writeFile(tmpPath, JSON.stringify(list, null, 2), 'utf-8');
+      await fs.rename(tmpPath, FAILURES_DATA_PATH);
     } catch (e) {
       console.error('Failed to persist failures:', e);
     }
@@ -85,7 +89,9 @@ class FailureStore {
   private async persistNotes(): Promise<void> {
     try {
       await fs.mkdir(path.dirname(NOTES_DATA_PATH), { recursive: true });
-      await fs.writeFile(NOTES_DATA_PATH, JSON.stringify(this.comfortNotes, null, 2), 'utf-8');
+      const tmpPath = `${NOTES_DATA_PATH}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 7)}`;
+      await fs.writeFile(tmpPath, JSON.stringify(this.comfortNotes, null, 2), 'utf-8');
+      await fs.rename(tmpPath, NOTES_DATA_PATH);
     } catch (e) {
       console.error('Failed to persist notes:', e);
     }
@@ -107,7 +113,7 @@ class FailureStore {
         }
         const { data, error } = await query;
         if (!error && data) {
-          return data.map((d: any) => this.mapDbRow(d, deviceId));
+          return data.map((d: Record<string, unknown>) => this.mapDbRow(d, deviceId));
         }
       } catch (e) {
         console.warn('Supabase fetch failed, fallback to local store:', e);
@@ -159,9 +165,10 @@ class FailureStore {
     // 1일 1회 작성 제한 (새벽 3시 KST 기준 - deviceId 및 userId 복합 확인)
     const existing = await this.getTodaysFailure(failureData.deviceId, failureData.userId);
     if (existing) {
-      const err = new Error('오늘은 이미 실패를 공유하셨습니다. 매일 새벽 3시에 새로운 실패를 털어놓으실 수 있어요!');
-      (err as any).existingFailure = existing;
-      (err as any).code = 'LIMIT_EXCEEDED';
+      const err = Object.assign(
+        new Error('오늘은 이미 실패를 공유하셨습니다. 매일 새벽 3시에 새로운 실패를 털어놓으실 수 있어요!'),
+        { existingFailure: existing, code: 'LIMIT_EXCEEDED' }
+      );
       throw err;
     }
 
@@ -179,13 +186,19 @@ class FailureStore {
       try {
         await supabase.from('failures').insert({
           id: newFailure.id,
+          user_id: newFailure.userId || null,
           device_id: newFailure.deviceId,
+          author_nickname: newFailure.authorNickname || null,
           content: newFailure.content,
           category: newFailure.category,
           tags: newFailure.tags,
-          ai_comfort_quote: newFailure.aiComfortQuote,
-          embedding: newFailure.embedding,
+          ai_comfort_quote: newFailure.aiComfortQuote || null,
+          ai_peer_story: newFailure.aiPeerStory || null,
+          embedding: newFailure.embedding || null,
           reactions: newFailure.reactions,
+          report_count: 0,
+          is_overcome: false,
+          is_blinded: false,
           is_seed: false,
         });
       } catch (err) {
@@ -393,31 +406,42 @@ class FailureStore {
     return failure;
   }
 
-  // 회원 탈퇴 시 모든 작성 사연 및 온기 쪽지 영구 파기
+  // 회원 탈퇴 및 게스트 데이터 정리 시 작성 사연 및 온기 쪽지 안전 파기
   async deleteUserData(userId?: string, deviceId?: string): Promise<void> {
     await this.init();
-    const toDelete: string[] = [];
+    const toDeleteIds: string[] = [];
+
     for (const [id, f] of this.failures.entries()) {
-      const matchUser = Boolean(userId && f.userId === userId);
-      const matchDevice = Boolean(deviceId && f.deviceId === deviceId);
-      if (matchUser || matchDevice) {
-        toDelete.push(id);
+      if (userId) {
+        // 회원 탈퇴: 해당 회원의 사연만 삭제
+        if (f.userId === userId) {
+          toDeleteIds.push(id);
+        }
+      } else if (deviceId) {
+        // 게스트 정리: 회원 소유가 아닌 해당 기기의 게스트 사연만 삭제
+        if (!f.userId && f.deviceId === deviceId) {
+          toDeleteIds.push(id);
+        }
       }
     }
-    toDelete.forEach((id) => this.failures.delete(id));
+
+    toDeleteIds.forEach((id) => this.failures.delete(id));
     await this.persistFailures();
 
-    // 관련 온기 쪽지 영구 파기
-    this.comfortNotes = this.comfortNotes.filter(
-      (n) => (userId ? n.targetUserId !== userId : true)
-    );
+    // 관련 온기 쪽지 영구 파기 (해당 회원 대상 쪽지 및 삭제된 사연에 달린 쪽지 제거)
+    const deletedIdSet = new Set(toDeleteIds);
+    this.comfortNotes = this.comfortNotes.filter((n) => {
+      if (userId && n.targetUserId === userId) return false;
+      if (deletedIdSet.has(n.failureId)) return false;
+      return true;
+    });
     await this.persistNotes();
 
     // Supabase 연동 환경인 경우 DB 레코드도 함께 삭제
     if (supabase) {
       try {
         if (userId) await supabase.from('failures').delete().eq('user_id', userId);
-        if (deviceId) await supabase.from('failures').delete().eq('device_id', deviceId);
+        else if (deviceId) await supabase.from('failures').delete().eq('device_id', deviceId).is('user_id', null);
       } catch (e) {
         console.warn('Supabase delete failed:', e);
       }
@@ -434,20 +458,23 @@ class FailureStore {
     };
   }
 
-  private mapDbRow(row: any, deviceId?: string): Failure {
+  private mapDbRow(row: Record<string, unknown>, deviceId?: string): Failure {
     const failure: Failure = {
-      id: row.id,
-      deviceId: row.device_id,
-      content: row.content,
-      category: row.category,
-      tags: row.tags || [],
-      aiComfortQuote: row.ai_comfort_quote,
-      reactions: row.reactions || { comfort: 0, relate: 0, kick: 0, cheer: 0 },
-      reportCount: row.report_count || 0,
-      isBlinded: row.is_blinded || false,
-      isSeed: row.is_seed || false,
-      isOvercome: row.is_overcome || false,
-      createdAt: row.created_at,
+      id: String(row.id || ''),
+      deviceId: String(row.device_id || ''),
+      userId: row.user_id ? String(row.user_id) : undefined,
+      authorNickname: row.author_nickname ? String(row.author_nickname) : undefined,
+      content: String(row.content || ''),
+      category: (row.category as CategoryType) || '기타',
+      tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
+      aiComfortQuote: String(row.ai_comfort_quote || '괜찮아요, 내일은 더 잘 될 거예요.'),
+      aiPeerStory: row.ai_peer_story ? String(row.ai_peer_story) : undefined,
+      reactions: (row.reactions as ReactionCounts) || { comfort: 0, relate: 0, kick: 0, cheer: 0 },
+      reportCount: typeof row.report_count === 'number' ? row.report_count : 0,
+      isBlinded: Boolean(row.is_blinded),
+      isSeed: Boolean(row.is_seed),
+      isOvercome: Boolean(row.is_overcome),
+      createdAt: String(row.created_at || new Date().toISOString()),
     };
     return this.enrichWithUserReactions(failure, deviceId);
   }

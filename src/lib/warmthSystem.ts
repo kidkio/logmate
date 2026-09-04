@@ -3,6 +3,8 @@
 // 쿨타임 시스템: 10 온기 획득 시 15분(900초) 쿨타임 발동
 // 유저별 격리(User-Scoped): 계정 변경 및 로그아웃 시 레벨/온기/패스 완벽 분리
 
+import { Failure } from '@/types';
+
 export interface WarmthTier {
   level: number;
   title: string;
@@ -529,7 +531,7 @@ export function spendWarmth(amount: number, customUserId?: string | null): { suc
 // ==========================================
 // 유저별 패스 및 구독 상태 관리
 // ==========================================
-export function getStoredPassStatus(customUserId?: string | null): { hasPass: boolean; passInfo: any } {
+export function getStoredPassStatus(customUserId?: string | null): { hasPass: boolean; passInfo: Record<string, unknown> | null } {
   if (typeof window === 'undefined') return { hasPass: false, passInfo: null };
   const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
   const hasPassKey = getUserScopedKey('logmate_has_pass', uid);
@@ -538,7 +540,7 @@ export function getStoredPassStatus(customUserId?: string | null): { hasPass: bo
   const hasPass = localStorage.getItem(hasPassKey) === 'true';
   const passInfoStr = localStorage.getItem(passInfoKey);
 
-  let passInfo = null;
+  let passInfo: Record<string, unknown> | null = null;
   if (passInfoStr) {
     try {
       passInfo = JSON.parse(passInfoStr);
@@ -548,7 +550,7 @@ export function getStoredPassStatus(customUserId?: string | null): { hasPass: bo
   return { hasPass, passInfo };
 }
 
-export function saveStoredPass(passInfo: any, customUserId?: string | null) {
+export function saveStoredPass(passInfo: Record<string, unknown>, customUserId?: string | null) {
   if (typeof window === 'undefined') return;
   const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
   const hasPassKey = getUserScopedKey('logmate_has_pass', uid);
@@ -605,4 +607,47 @@ export function cleanupLegacyStorageKeys(): void {
     localStorage.removeItem('logmate_user_warmth_guest');
     localStorage.removeItem('logmate_lifetime_warmth_guest');
   } catch {}
+}
+
+// ==========================================
+// 해금 사연 통합 로드 및 저장 (계정/기기/게스트 간 누락 없는 완벽 동기화)
+// ==========================================
+export function loadAllUnlockedStories(userId?: string | null, deviceId?: string | null): Failure[] {
+  if (typeof window === 'undefined') return [];
+  const keys = [
+    userId ? `logmate_unlocked_stories_${userId}` : null,
+    deviceId ? `logmate_unlocked_stories_${deviceId}` : null,
+    'logmate_unlocked_stories_guest',
+  ].filter(Boolean) as string[];
+
+  const map = new Map<string, Failure>();
+  for (const k of keys) {
+    try {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (item && item.id && !map.has(item.id)) {
+              map.set(item.id, item);
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+  return Array.from(map.values());
+}
+
+export function saveAllUnlockedStories(stories: Failure[], userId?: string | null, deviceId?: string | null): void {
+  if (typeof window === 'undefined') return;
+  const primaryKey = userId
+    ? `logmate_unlocked_stories_${userId}`
+    : (deviceId ? `logmate_unlocked_stories_${deviceId}` : 'logmate_unlocked_stories_guest');
+  localStorage.setItem(primaryKey, JSON.stringify(stories));
+  if (userId && deviceId) {
+    localStorage.setItem(`logmate_unlocked_stories_${deviceId}`, JSON.stringify(stories));
+  }
+  // 브라우저 내 다른 컴포넌트(피드 숏츠 등)에 즉각 반영되도록 커스텀 이벤트 디스패치
+  window.dispatchEvent(new CustomEvent('logmate_unlocked_stories_changed', { detail: { stories } }));
 }

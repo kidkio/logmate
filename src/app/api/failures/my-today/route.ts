@@ -6,17 +6,17 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const deviceId = searchParams.get('deviceId') || '';
-    let userId = searchParams.get('userId') || undefined;
 
-    // 세션 쿠키에서도 userId 확인
-    const token = req.cookies.get('logmate_token')?.value;
-    if (token && !userId) {
+    // 세션 쿠키를 통해 인증된 회원 식별 (클라이언트 query parameter의 userId 조작 원천 차단)
+    let userId: string | undefined;
+    const token = req.cookies.get('logmate_token')?.value || req.headers.get('authorization')?.replace('Bearer ', '');
+    if (token) {
       const user = await getUserBySession(token);
       if (user) userId = user.id;
     }
 
     if (!deviceId && !userId) {
-      return NextResponse.json({ success: false, error: 'deviceId or userId is required' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'deviceId 또는 유효한 인증 정보가 필요합니다.' }, { status: 400 });
     }
 
     const todayFailure = await failureStore.getTodaysFailure(deviceId, userId);
@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
       categoryCount: similarData.categoryCount,
       aiPeerStory: similarData.aiPeerStory,
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '실패 사연을 불러오지 못했습니다.';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

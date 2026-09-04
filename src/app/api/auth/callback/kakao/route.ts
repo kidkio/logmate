@@ -60,12 +60,11 @@ export async function GET(req: NextRequest) {
       user = await createUser(kakaoEmail, randomSecret, kakaoNickname, 'kakao');
     }
 
-    // 4. 세션 생성 및 쿠키 발급
+    // 4. 세션 생성 및 쿠키 발급 (세션 토큰의 URL 노출 차단, 오직 HttpOnly 쿠키로만 안전 전달)
     const token = await createSession(user.id);
     const isSecure = homeUrl.startsWith('https:');
 
     const redirectUrl = new URL(homeUrl);
-    redirectUrl.searchParams.set('auth_token', token);
     redirectUrl.searchParams.set('auth_provider', 'kakao');
 
     const response = NextResponse.redirect(redirectUrl);

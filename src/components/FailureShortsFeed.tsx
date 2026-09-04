@@ -10,7 +10,6 @@ import {
   Flag,
   Video,
   Ticket,
-  BedDouble,
   Mail,
   Moon,
   Flame,
@@ -21,13 +20,13 @@ import {
   Award,
   ArrowDown,
   PenLine,
-  ExternalLink,
   LockOpen
 } from 'lucide-react';
 import { SendComfortNoteModal } from './SendComfortNoteModal';
 import { UnlockedSimilarModal } from './UnlockedSimilarModal';
 import { RewardedAdModal } from './RewardedAdModal';
 import { Toast } from './Toast';
+import { loadAllUnlockedStories, saveAllUnlockedStories } from '@/lib/warmthSystem';
 
 interface FailureShortsFeedProps {
   similarFailures: Failure[];
@@ -162,28 +161,24 @@ export function FailureShortsFeed({
   onNavigateTab,
   onOpenWriteGate,
 }: FailureShortsFeedProps) {
-  // 온기/리워드로 해금된 보너스 공감 사연 3편 상태
-  const [unlockedBonusFailures, setUnlockedBonusFailures] = useState<Failure[]>([]);
+  // 온기/리워드로 해금된 보너스 공감 사연 상태 (유저/기기 통합 및 실시간 동기화)
+  const [unlockedBonusFailures, setUnlockedBonusFailures] = useState<Failure[]>(() => {
+    return loadAllUnlockedStories(userId, deviceId);
+  });
   const [isUnlockedModalOpen, setIsUnlockedModalOpen] = useState(false);
 
-  // 계정별 격리된 해금 사연 스토리지 키
-  const storageKey = `logmate_unlocked_stories_${userId || deviceId || 'guest'}`;
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setUnlockedBonusFailures(parsed);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to parse unlocked stories:', e);
+    const handleUnlockedChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ stories?: Failure[] }>;
+      if (customEvent.detail?.stories) {
+        setUnlockedBonusFailures(customEvent.detail.stories);
+      } else {
+        setUnlockedBonusFailures(loadAllUnlockedStories(userId, deviceId));
       }
-    }
-  }, [storageKey]);
+    };
+    window.addEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
+    return () => window.removeEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
+  }, [userId, deviceId]);
 
   // 본인 작성 사연 철저 식별 (오늘 사연, 내 보관함 전체 사연, 기기/계정 일치 사연 모두 제외)
   const isMyStory = useCallback(
@@ -200,9 +195,12 @@ export function FailureShortsFeed({
 
   // 1. 알고리즘 기반 피드 구성 (본인 사연 절대 배제)
   const topSimilar = similarFailures.filter((f) => !isMyStory(f)).slice(0, 3);
-  const validUnlockedBonus = unlockedBonusFailures.filter(
-    (f) => !isMyStory(f) && !topSimilar.some((ts) => ts.id === f.id)
-  );
+  const seenUnlockedIds = new Set<string>();
+  const validUnlockedBonus = unlockedBonusFailures.filter((f) => {
+    if (!f || !f.id || seenUnlockedIds.has(f.id)) return false;
+    seenUnlockedIds.add(f.id);
+    return !isMyStory(f) && !topSimilar.some((ts) => ts.id === f.id);
+  });
   const others = otherFailures.filter(
     (f) =>
       !isMyStory(f) &&
@@ -863,9 +861,7 @@ export function FailureShortsFeed({
               const updated = [...unlockedBonusFailures, ...newlyAdded];
               setUnlockedBonusFailures(updated);
               setIsUnlockedModalOpen(true);
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(storageKey, JSON.stringify(updated));
-              }
+              saveAllUnlockedStories(updated, userId, deviceId);
               setToastMessage(`🎉 보상 획득! 숨겨진 공감 사연 3편이 즉시 열렸습니다 🔓 (총 ${updated.length}편 보유)`);
             } else {
               setToastMessage('🎉 보상 획득! 추가 사연을 불러왔습니다.');

@@ -17,9 +17,11 @@ import {
   getBoosterStatus,
   activateBooster,
   BoosterStatus,
-  saveStoredPass,
   WarmthProgress,
-  WARMTH_SHOP_PRICES 
+  WARMTH_SHOP_PRICES,
+  saveStoredPass,
+  loadAllUnlockedStories,
+  saveAllUnlockedStories,
 } from '@/lib/warmthSystem';
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
@@ -77,8 +79,10 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
   const [isWarmthShopOpen, setIsWarmthShopOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 온기로 해금된 숨겨진 공감 사연 3편 상태
-  const [unlockedFailures, setUnlockedFailures] = useState<Failure[]>([]);
+  // 온기로 해금된 숨겨진 공감 사연 상태
+  const [unlockedFailures, setUnlockedFailures] = useState<Failure[]>(() => {
+    return loadAllUnlockedStories(user?.id, deviceId);
+  });
   const [isUnlockedModalOpen, setIsUnlockedModalOpen] = useState(false);
 
   // 온기 레벨 & 진척도 상태
@@ -108,20 +112,18 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
     setTodayBlessing(blessing);
     setIsBlessingClaimedToday(isBlessingClaimed(blessing.id, user?.id));
 
-    if (typeof window !== 'undefined') {
-      try {
-        const unlockedKey = `logmate_unlocked_stories_${user?.id || deviceId || 'guest'}`;
-        const storedStories = localStorage.getItem(unlockedKey);
-        if (storedStories) {
-          const parsed = JSON.parse(storedStories);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setUnlockedFailures(parsed);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to parse unlocked stories in lounge:', e);
+    setUnlockedFailures(loadAllUnlockedStories(user?.id, deviceId));
+
+    const handleUnlockedChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ stories?: Failure[] }>;
+      if (customEvent.detail?.stories) {
+        setUnlockedFailures(customEvent.detail.stories);
+      } else {
+        setUnlockedFailures(loadAllUnlockedStories(user?.id, deviceId));
       }
-    }
+    };
+    window.addEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
+    return () => window.removeEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
   }, [user?.id, deviceId]);
 
   // 1초 주기로 쿨타임 및 피버 부스터 카운트다운 갱신
@@ -1479,17 +1481,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
 
           // 실제 숨겨진 공감 사연 3편 누적 로드
           try {
-            const unlockedKey = `logmate_unlocked_stories_${user?.id || deviceId || 'guest'}`;
-            let currentUnlocked: Failure[] = [];
-            if (typeof window !== 'undefined') {
-              try {
-                const stored = localStorage.getItem(unlockedKey);
-                if (stored) {
-                  const parsed = JSON.parse(stored);
-                  if (Array.isArray(parsed)) currentUnlocked = parsed;
-                }
-              } catch {}
-            }
+            const currentUnlocked = loadAllUnlockedStories(user?.id, deviceId);
 
             const params = new URLSearchParams();
             if (deviceId) params.set('deviceId', deviceId);
@@ -1506,9 +1498,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
               const updatedList = [...currentUnlocked, ...newlyAdded];
               setUnlockedFailures(updatedList);
               setIsUnlockedModalOpen(true);
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(unlockedKey, JSON.stringify(updatedList));
-              }
+              saveAllUnlockedStories(updatedList, user?.id, deviceId);
               setToastMessage(`🔓 새로운 공감 사연 3편이 추가 해금되었습니다! (총 ${updatedList.length}편 보유)`);
             } else {
               if (currentUnlocked.length > 0) {
