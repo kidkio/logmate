@@ -22,6 +22,7 @@ import {
   saveStoredPass,
   loadAllUnlockedStories,
   saveAllUnlockedStories,
+  syncWarmthWithServer,
 } from '@/lib/warmthSystem';
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
@@ -113,6 +114,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
     setIsBlessingClaimedToday(isBlessingClaimed(blessing.id, user?.id));
 
     setUnlockedFailures(loadAllUnlockedStories(user?.id, deviceId));
+    syncWarmthWithServer(user?.id, deviceId).catch(() => {});
 
     const handleUnlockedChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ stories?: Failure[] }>;

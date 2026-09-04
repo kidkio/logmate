@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, ShieldCheck, Send, RefreshCw, AlertCircle, Flame, Moon, LockOpen } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { CreateFailureResponse } from '@/types';
+import { CreateFailureResponse, Failure } from '@/types';
 import { getDeviceId } from '@/lib/device';
+import { loadAllUnlockedStories } from '@/lib/warmthSystem';
+import { UnlockedSimilarModal } from './UnlockedSimilarModal';
 
 interface DailyRitualGateProps {
   onSuccess: (result: CreateFailureResponse) => void;
@@ -24,6 +26,35 @@ export function DailyRitualGate({ onSuccess }: DailyRitualGateProps) {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // 온기로 해금된 비밀 사연 상태 (오늘 사연 작성 전에도 열람 가능)
+  const [unlockedStories, setUnlockedStories] = useState<Failure[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const devId = getDeviceId();
+    return loadAllUnlockedStories(user?.id, devId);
+  });
+  const [isUnlockedModalOpen, setIsUnlockedModalOpen] = useState(false);
+
+  useEffect(() => {
+    const devId = getDeviceId();
+    const timer = setTimeout(() => {
+      setUnlockedStories(loadAllUnlockedStories(user?.id, devId));
+    }, 0);
+
+    const handleUnlockedChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ stories?: Failure[] }>;
+      if (customEvent.detail?.stories) {
+        setUnlockedStories(customEvent.detail.stories);
+      } else {
+        setUnlockedStories(loadAllUnlockedStories(user?.id, devId));
+      }
+    };
+    window.addEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
+    };
+  }, [user?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +128,30 @@ export function DailyRitualGate({ onSuccess }: DailyRitualGateProps) {
           <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
             솔직하게 털어놓으면 <strong className="text-indigo-300">나와 닮은 고민을 겪은 이웃들의 사연 피드</strong>가 바로 열립니다.
           </p>
+
+          {/* 온기로 이미 사연을 해금한 경우 즉시 열람할 수 있는 상단 배너 */}
+          {unlockedStories.length > 0 && (
+            <div className="pt-2 px-1">
+              <div className="max-w-xs sm:max-w-sm mx-auto bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-indigo-500/20 border border-amber-500/50 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between shadow-[0_0_25px_rgba(245,158,11,0.25)] animate-pulse">
+                <div className="flex items-center gap-2 text-left">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/25 border border-amber-500/40 flex items-center justify-center text-amber-300 flex-shrink-0">
+                    <LockOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-200">해금된 비밀 사연 {unlockedStories.length}편 보유 중</p>
+                    <p className="text-[10px] text-slate-400">사연 작성 전에도 지금 바로 읽어보실 수 있어요</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsUnlockedModalOpen(true)}
+                  className="text-[11px] font-bold text-white bg-gradient-to-r from-amber-500 to-pink-500 px-3 py-1.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md flex-shrink-0 ml-2"
+                >
+                  열람하기
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -185,6 +240,13 @@ export function DailyRitualGate({ onSuccess }: DailyRitualGateProps) {
         <ShieldCheck className="w-3 h-3 text-emerald-400" />
         <span>100% 완전 익명으로 등록되며 다른 사람의 실패가 열립니다</span>
       </div>
+
+      {/* 온기로 해금된 사연 모달 */}
+      <UnlockedSimilarModal
+        isOpen={isUnlockedModalOpen}
+        onClose={() => setIsUnlockedModalOpen(false)}
+        unlockedFailures={unlockedStories}
+      />
     </div>
   );
 }

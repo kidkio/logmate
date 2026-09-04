@@ -72,6 +72,39 @@ class FailureStore {
       const notesRaw = await fs.readFile(NOTES_DATA_PATH, 'utf-8');
       this.comfortNotes = JSON.parse(notesRaw);
     } catch {}
+
+    // Supabase 연동 시 원격 데이터 동기화
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('failures').select('*').order('created_at', { ascending: false });
+        if (!error && data && data.length > 0) {
+          for (const row of data) {
+            const f = this.mapDbRow(row as Record<string, unknown>);
+            if (!f.isSeed && !f.id.startsWith('seed-')) {
+              this.failures.set(f.id, f);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase initial failures fetch failed:', err);
+      }
+
+      try {
+        const { data: notesData, error: notesError } = await supabase.from('comfort_notes').select('*').order('created_at', { ascending: false });
+        if (!notesError && notesData && notesData.length > 0) {
+          this.comfortNotes = notesData.map((row: Record<string, unknown>) => ({
+            id: String(row.id),
+            failureId: String(row.failure_id),
+            targetUserId: row.target_user_id ? String(row.target_user_id) : undefined,
+            fromNickname: String(row.from_nickname),
+            message: String(row.message),
+            createdAt: String(row.created_at),
+          }));
+        }
+      } catch (err) {
+        console.warn('Supabase initial notes fetch failed:', err);
+      }
+    }
   }
 
   private async persistFailures(): Promise<void> {
@@ -381,6 +414,20 @@ class FailureStore {
       createdAt: new Date().toISOString(),
     };
     this.comfortNotes.unshift(note);
+    if (supabase) {
+      try {
+        await supabase.from('comfort_notes').insert({
+          id: note.id,
+          failure_id: note.failureId,
+          target_user_id: note.targetUserId || null,
+          from_nickname: note.fromNickname,
+          message: note.message,
+          created_at: note.createdAt,
+        });
+      } catch (err) {
+        console.warn('Supabase note insert failed:', err);
+      }
+    }
     await this.persistNotes();
     return note;
   }
@@ -402,6 +449,13 @@ class FailureStore {
     const failure = this.failures.get(failureId);
     if (!failure) throw new Error('Failure not found');
     failure.isOvercome = !failure.isOvercome;
+    if (supabase) {
+      try {
+        await supabase.from('failures').update({ is_overcome: failure.isOvercome }).eq('id', failureId);
+      } catch (err) {
+        console.warn('Supabase toggleOvercome update failed:', err);
+      }
+    }
     await this.persistFailures();
     return failure;
   }
@@ -440,8 +494,12 @@ class FailureStore {
     // Supabase 연동 환경인 경우 DB 레코드도 함께 삭제
     if (supabase) {
       try {
-        if (userId) await supabase.from('failures').delete().eq('user_id', userId);
-        else if (deviceId) await supabase.from('failures').delete().eq('device_id', deviceId).is('user_id', null);
+        if (userId) {
+          await supabase.from('failures').delete().eq('user_id', userId);
+          await supabase.from('comfort_notes').delete().eq('target_user_id', userId);
+        } else if (deviceId) {
+          await supabase.from('failures').delete().eq('device_id', deviceId).is('user_id', null);
+        }
       } catch (e) {
         console.warn('Supabase delete failed:', e);
       }

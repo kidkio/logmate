@@ -18,6 +18,31 @@ export async function GET(request: NextRequest) {
   const secretKey = process.env.TOSS_SECRET_KEY || DEFAULT_TEST_SECRET_KEY;
   const basicAuth = Buffer.from(`${secretKey}:`).toString('base64');
 
+  // 주문 번호에서 플랜 분석 및 결제 금액 위변조 서버 강제 검증
+  const PLAN_PRICES: Record<string, number> = {
+    day: 990,
+    month: 4900,
+    lifetime: 19900,
+  };
+
+  let plan = 'month';
+  let durationDays = 30;
+
+  if (orderId.includes('_DAY_')) {
+    plan = 'day';
+    durationDays = 1;
+  } else if (orderId.includes('_LIFETIME_')) {
+    plan = 'lifetime';
+    durationDays = 36500;
+  }
+
+  const expectedPrice = PLAN_PRICES[plan];
+  if (expectedPrice !== undefined && Number(amount) !== expectedPrice) {
+    console.error(`Payment tampering attempt detected! Order: ${orderId}, expected: ${expectedPrice}, got: ${amount}`);
+    const errMsg = encodeURIComponent('결제 금액 변조가 감지되어 승인이 거부되었습니다.');
+    return NextResponse.redirect(`${appUrl}/?payment=fail&message=${errMsg}`);
+  }
+
   try {
     // 토스페이먼츠 결제 승인 API 호출
     const response = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
@@ -39,18 +64,6 @@ export async function GET(request: NextRequest) {
       console.error('Toss payment confirm error:', paymentData);
       const errMsg = encodeURIComponent(paymentData.message || '결제 승인 중 오류가 발생했습니다.');
       return NextResponse.redirect(`${appUrl}/?payment=fail&message=${errMsg}`);
-    }
-
-    // 주문 번호에서 플랜 분석 (LOGMATE_DAY_... / LOGMATE_MONTH_... / LOGMATE_LIFETIME_...)
-    let plan = 'month';
-    let durationDays = 30;
-
-    if (orderId.includes('_DAY_')) {
-      plan = 'day';
-      durationDays = 1;
-    } else if (orderId.includes('_LIFETIME_')) {
-      plan = 'lifetime';
-      durationDays = 36500;
     }
 
     const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();

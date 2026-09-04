@@ -494,6 +494,12 @@ export function addWarmth(amount: number = 1, customUserId?: string | null): Add
   if (typeof window !== 'undefined') {
     localStorage.setItem(spendableKey, newSpendable.toString());
     localStorage.setItem(lifetimeKey, newLifetime.toString());
+    // 서버 원장에 안전하게 비동기 적립 동기화
+    fetch('/api/warmth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'earn', amount: effectiveAmount }),
+    }).catch(() => {});
   }
 
   const progress = calculateWarmthProgress(newLifetime, newSpendable);
@@ -523,9 +529,40 @@ export function spendWarmth(amount: number, customUserId?: string | null): { suc
   const newSpendable = current.spendable - amount;
   if (typeof window !== 'undefined') {
     localStorage.setItem(getUserScopedKey(STORAGE_SPENDABLE, uid), newSpendable.toString());
+    // 서버 원장 차감 반영
+    fetch('/api/warmth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'spend', amount }),
+    }).catch(() => {});
   }
 
   return { success: true, remaining: newSpendable };
+}
+
+export async function syncWarmthWithServer(customUserId?: string | null, deviceId?: string | null): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
+    const current = getStoredWarmth(uid);
+    const res = await fetch('/api/warmth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'sync',
+        clientLifetime: current.lifetime,
+        clientSpendable: current.spendable,
+        deviceId: deviceId || undefined,
+      }),
+    });
+    const data = await res.json();
+    if (data.success && typeof data.lifetime === 'number' && typeof data.spendable === 'number') {
+      const spendableKey = getUserScopedKey(STORAGE_SPENDABLE, uid);
+      const lifetimeKey = getUserScopedKey(STORAGE_LIFETIME, uid);
+      localStorage.setItem(spendableKey, data.spendable.toString());
+      localStorage.setItem(lifetimeKey, data.lifetime.toString());
+    }
+  } catch {}
 }
 
 // ==========================================
@@ -614,14 +651,38 @@ export function cleanupLegacyStorageKeys(): void {
 // ==========================================
 export function loadAllUnlockedStories(userId?: string | null, deviceId?: string | null): Failure[] {
   if (typeof window === 'undefined') return [];
-  const keys = [
+  const map = new Map<string, Failure>();
+
+  try {
+    // 1. localStorage 내의 모든 logmate_unlocked_stories 프리픽스 키 전수 탐색
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('logmate_unlocked_stories')) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              for (const item of parsed) {
+                if (item && item.id && !map.has(item.id)) {
+                  map.set(item.id, item);
+                }
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // 2. 명시적 키 목록 추가 확인
+  const explicitKeys = [
     userId ? `logmate_unlocked_stories_${userId}` : null,
     deviceId ? `logmate_unlocked_stories_${deviceId}` : null,
     'logmate_unlocked_stories_guest',
   ].filter(Boolean) as string[];
 
-  const map = new Map<string, Failure>();
-  for (const k of keys) {
+  for (const k of explicitKeys) {
     try {
       const raw = localStorage.getItem(k);
       if (raw) {
@@ -636,6 +697,7 @@ export function loadAllUnlockedStories(userId?: string | null, deviceId?: string
       }
     } catch {}
   }
+
   return Array.from(map.values());
 }
 

@@ -168,6 +168,10 @@ export function FailureShortsFeed({
   const [isUnlockedModalOpen, setIsUnlockedModalOpen] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setUnlockedBonusFailures(loadAllUnlockedStories(userId, deviceId));
+    }, 0);
+
     const handleUnlockedChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ stories?: Failure[] }>;
       if (customEvent.detail?.stories) {
@@ -177,7 +181,10 @@ export function FailureShortsFeed({
       }
     };
     window.addEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
-    return () => window.removeEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('logmate_unlocked_stories_changed', handleUnlockedChange);
+    };
   }, [userId, deviceId]);
 
   // 본인 작성 사연 철저 식별 (오늘 사연, 내 보관함 전체 사연, 기기/계정 일치 사연 모두 제외)
@@ -213,19 +220,19 @@ export function FailureShortsFeed({
   if (topSimilar.length === 0 && others.length === 0 && validUnlockedBonus.length === 0) {
     items.push({ type: 'empty' });
   } else {
-    // [단계 1] 나와 가장 닮은 상위 사연 (기본 3편, 타 이웃의 사연만)
-    topSimilar.forEach((failure, idx) => {
+    // [단계 1] 온기/광고로 잠금 해제된 숨겨진 공감 사연 (유저가 획득한 사연 최우선 노출)
+    validUnlockedBonus.forEach((failure, idx) => {
       items.push({
-        type: 'similar',
+        type: 'unlocked_bonus',
         failure,
         rank: idx + 1,
       });
     });
 
-    // [단계 1-2] 온기/광고로 잠금 해제된 숨겨진 공감 사연 (추가 3편)
-    validUnlockedBonus.forEach((failure, idx) => {
+    // [단계 1-2] 나와 가장 닮은 상위 사연 (기본 3편, 타 이웃의 사연)
+    topSimilar.forEach((failure, idx) => {
       items.push({
-        type: 'unlocked_bonus',
+        type: 'similar',
         failure,
         rank: idx + 1,
       });
@@ -366,6 +373,17 @@ export function FailureShortsFeed({
             <span className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-black/70 backdrop-blur-md border border-indigo-500/40 px-2.5 py-0.5 rounded-full shadow-lg">
               <span>모두의 사연 피드</span>
             </span>
+          )}
+
+          {/* 해금된 비밀 사연이 존재할 때 언제든 바로 모달을 열람할 수 있는 다이렉트 버튼 */}
+          {validUnlockedBonus.length > 0 && (
+            <button
+              onClick={() => setIsUnlockedModalOpen(true)}
+              className="pointer-events-auto flex items-center gap-1 text-[10px] font-bold text-amber-200 bg-amber-950/90 border border-amber-500/50 px-2.5 py-0.5 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.35)] hover:brightness-125 active:scale-95 transition-all"
+            >
+              <LockOpen className="w-3 h-3 text-amber-400 animate-pulse" />
+              <span>해금 사연 {validUnlockedBonus.length}편 보기</span>
+            </button>
           )}
 
           {/* 아직 쓰지 않고 둘러보는 유저를 위한 글쓰기 버튼 */}

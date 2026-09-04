@@ -15,13 +15,15 @@ import {
   Quote,
   AlertTriangle,
   Ticket,
-  RotateCcw
+  RotateCcw,
+  Bell
 } from 'lucide-react';
 import { FailureCard } from './FailureCard';
 import { MoonlightCalendar } from './MoonlightCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { getDeviceId } from '@/lib/device';
 import { calculateWarmthProgress, getStoredWarmth, getStoredPassStatus, clearStoredPass, WarmthProgress } from '@/lib/warmthSystem';
+import { notifyIfNewComfortNotes, requestNotificationPermission } from '@/lib/notifications';
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
 import { RefundModal } from './RefundModal';
@@ -65,17 +67,26 @@ export function MyArchiveTab({
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
 
   useEffect(() => {
-    const { passInfo: pInfo } = getStoredPassStatus(user?.id);
-    setPassInfo(pInfo);
+    const timer = setTimeout(() => {
+      const { passInfo: pInfo } = getStoredPassStatus(user?.id);
+      setPassInfo(pInfo as typeof passInfo);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [hasPass, user?.id]);
 
   useEffect(() => {
-    const stored = getStoredWarmth(user?.id);
-    setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
+    const timer = setTimeout(() => {
+      const stored = getStoredWarmth(user?.id);
+      setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [user?.id]);
 
   useEffect(() => {
-    setFailuresState(myFailures);
+    const timer = setTimeout(() => {
+      setFailuresState(myFailures);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [myFailures]);
 
   // 받은 온기 쪽지 불러오기
@@ -86,6 +97,7 @@ export function MyArchiveTab({
         .then((data) => {
           if (data.success && Array.isArray(data.notes)) {
             setComfortNotes(data.notes);
+            notifyIfNewComfortNotes(data.notes.length);
           }
         })
         .catch(console.error);
@@ -356,7 +368,20 @@ export function MyArchiveTab({
                 </span>
               </h4>
             </div>
-            <span className="text-[9px] text-slate-500">따뜻한 마음들</span>
+            <button
+              type="button"
+              onClick={async () => {
+                const granted = await requestNotificationPermission();
+                if (granted) {
+                  alert('🔔 온기 쪽지 브라우저 알림이 켜졌습니다! 새로운 쪽지가 도착하면 알려드릴게요.');
+                }
+              }}
+              className="text-[10px] font-semibold text-pink-300 hover:text-white bg-pink-950/60 hover:bg-pink-900/80 border border-pink-500/30 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 active:scale-95 shadow-sm"
+              title="새로운 온기 쪽지가 도착하면 브라우저 푸시 알림으로 알려드립니다"
+            >
+              <Bell className="w-3 h-3 text-pink-400" />
+              <span>쪽지 알림 켜기</span>
+            </button>
           </div>
 
           <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
