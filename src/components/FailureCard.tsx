@@ -9,6 +9,7 @@ interface FailureCardProps {
   onReaction: (failureId: string, type: ReactionType) => void;
   onReport: (failureId: string) => void;
   isCompact?: boolean;
+  isMine?: boolean;
 }
 
 const REACTION_CONFIG: {
@@ -68,6 +69,7 @@ export function FailureCard({
   onReaction,
   onReport,
   isCompact = false,
+  isMine = false,
 }: FailureCardProps) {
   const [showAiQuote, setShowAiQuote] = useState(false);
 
@@ -79,6 +81,12 @@ export function FailureCard({
       {/* 상단 태그 및 시간 바 */}
       <div className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center flex-wrap gap-1.5">
+          {isMine && (
+            <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+              내 사연
+            </span>
+          )}
+
           <span
             className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${categoryStyle}`}
           >
@@ -102,13 +110,15 @@ export function FailureCard({
           <span className="text-[10px] text-slate-500 font-mono">
             {formatTimeAgo(failure.createdAt)}
           </span>
-          <button
-            onClick={() => onReport(failure.id)}
-            className="text-slate-600 hover:text-rose-400 p-1 rounded-lg hover:bg-white/[0.04] transition-colors"
-            title="신고하기"
-          >
-            <Flag className="w-3 h-3" />
-          </button>
+          {!isMine && (
+            <button
+              onClick={() => onReport(failure.id)}
+              className="text-slate-600 hover:text-rose-400 p-1 rounded-lg hover:bg-white/[0.04] transition-colors"
+              title="신고하기"
+            >
+              <Flag className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -142,11 +152,39 @@ export function FailureCard({
         </div>
       )}
 
-      {/* 이모지 리액션 버튼 그리드 (21st.dev 마이크로 필 뱃지 스타일) */}
+      {/* 이모지 리액션 (내가 쓴 글인 경우: 받은 공감 통계 표시, 타인의 글인 경우: 공감 버튼) */}
       <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center flex-wrap gap-1.5 sm:gap-2">
+        {isMine && (
+          <div className="w-full flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span className="text-[11px] font-medium text-slate-400">이웃들에게 받은 따뜻한 공감</span>
+            <span className="text-[10px] text-indigo-300 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+              총 {Object.values(failure.reactions).reduce((a, b) => a + b, 0)}개
+            </span>
+          </div>
+        )}
         {REACTION_CONFIG.map(({ type, emoji, label, activeClass }) => {
           const count = failure.reactions[type] || 0;
           const isSelected = failure.userReactions?.includes(type);
+
+          if (isMine) {
+            return (
+              <div
+                key={type}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border ${
+                  count > 0
+                    ? 'bg-white/[0.06] text-slate-200 border-white/10'
+                    : 'bg-white/[0.02] text-slate-500 border-white/[0.04]'
+                }`}
+                title={`받은 ${label} ${count}개`}
+              >
+                <span className="text-sm leading-none">{emoji}</span>
+                <span className="text-[11px] hidden sm:inline">{label}</span>
+                <span className={`text-[11px] font-bold font-mono ${count > 0 ? 'text-amber-300' : 'text-slate-500'}`}>
+                  {count}
+                </span>
+              </div>
+            );
+          }
 
           return (
             <button

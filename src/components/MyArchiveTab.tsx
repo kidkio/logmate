@@ -429,6 +429,7 @@ export function MyArchiveTab({
                     failure={failure}
                     onReaction={onReaction}
                     onReport={onReport}
+                    isMine={true}
                   />
                 </div>
               </div>

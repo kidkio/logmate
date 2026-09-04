@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { failureStore } from '@/lib/storage';
+import { failureStore, isFailureOwnedBy } from '@/lib/storage';
 import { getUserBySession } from '@/lib/user-store';
 import { calculateKoreanSimilarity } from '@/lib/koreanSimilarity';
 import { Failure } from '@/types';
@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
       : null;
 
     const allFailures = await failureStore.getAll(deviceId, '전체', 'popular');
-    const available = allFailures.filter((f) => !todayFailure || f.id !== todayFailure.id);
+    // 본인이 작성한 글은 해금 비밀 사연 후보에서 완전히 배제
+    const available = allFailures.filter(
+      (f) => !isFailureOwnedBy(f, deviceId, userId) && (!todayFailure || f.id !== todayFailure.id)
+    );
 
     let unlocked: Failure[] = [];
 

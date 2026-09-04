@@ -110,6 +110,11 @@ export async function getUserById(id: string): Promise<UserRecord | null> {
   return users.find((u) => u.id === id) || null;
 }
 
+export async function getUserCount(): Promise<number> {
+  const users = await readUsers();
+  return users.length;
+}
+
 export async function createUser(
   email: string,
   password: string,

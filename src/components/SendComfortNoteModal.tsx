@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Mail, Send, X, Sparkles, CheckCircle2, Heart } from 'lucide-react';
 import { Failure } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { getDeviceId } from '@/lib/device';
 
 interface SendComfortNoteModalProps {
   failure: Failure | null;
@@ -34,10 +35,16 @@ export function SendComfortNoteModal({
 
   if (!isOpen || !failure) return null;
 
+  const currentDeviceId = typeof window !== 'undefined' ? getDeviceId() : '';
+  const isSelf = Boolean(
+    (user?.id && failure.userId && user.id === failure.userId) ||
+    (currentDeviceId && failure.deviceId && currentDeviceId === failure.deviceId)
+  );
+
   const currentMessage = customText.trim() || selectedPreset;
 
   const handleSend = async () => {
-    if (!currentMessage) return;
+    if (!currentMessage || isSelf) return;
 
     setIsSending(true);
     try {
@@ -49,6 +56,7 @@ export function SendComfortNoteModal({
           targetUserId: failure.userId || failure.deviceId,
           fromNickname: user?.nickname || '익명의 이웃',
           message: currentMessage,
+          deviceId: currentDeviceId,
         }),
       });
 
@@ -78,7 +86,27 @@ export function SendComfortNoteModal({
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-sm glass-card rounded-2xl sm:rounded-3xl p-5 border border-pink-500/30 shadow-[0_0_50px_rgba(236,72,153,0.25)] space-y-4 animate-in zoom-in-95 duration-200"
       >
-        {isDone ? (
+        {isSelf ? (
+          <div className="py-6 text-center space-y-3 animate-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-100">
+              내가 작성한 사연입니다
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed px-2">
+              나 자신에게 보내는 쪽지는 보낼 수 없습니다.<br />
+              다른 이웃들의 사연에 따뜻한 위로와 응원을 건네보세요!
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-2 py-2 px-5 rounded-xl font-semibold text-xs text-slate-200 bg-white/10 hover:bg-white/20 border border-white/10 transition-all"
+            >
+              닫기
+            </button>
+          </div>
+        ) : isDone ? (
           <div className="py-8 text-center space-y-3 animate-in zoom-in-95">
             <div className="w-14 h-14 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(236,72,153,0.4)]">
               <Heart className="w-7 h-7 fill-pink-400" />

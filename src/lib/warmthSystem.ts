@@ -396,6 +396,19 @@ export function getStoredWarmth(customUserId?: string | null): { spendable: numb
   return { spendable, lifetime };
 }
 
+export function grantBonusWarmth(amount: number, customUserId?: string | null): { spendable: number; lifetime: number } {
+  if (typeof window === 'undefined') return { spendable: 0, lifetime: 0 };
+  const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
+  const current = getStoredWarmth(uid);
+  const newSpendable = current.spendable + amount;
+  const newLifetime = current.lifetime + amount;
+  const spendableKey = getUserScopedKey(STORAGE_SPENDABLE, uid);
+  const lifetimeKey = getUserScopedKey(STORAGE_LIFETIME, uid);
+  localStorage.setItem(spendableKey, newSpendable.toString());
+  localStorage.setItem(lifetimeKey, newLifetime.toString());
+  return { spendable: newSpendable, lifetime: newLifetime };
+}
+
 export interface AddWarmthResult {
   success: boolean;
   spendable: number;

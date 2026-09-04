@@ -218,7 +218,7 @@ function MainApp() {
     const otherFailures = failures.filter(
       (f) => f.id !== result.failure.id && !top3.some((sf) => sf.id === f.id)
     );
-    setFailures([...top3, ...otherFailures]);
+    setFailures(otherFailures);
     setMyFailures((prev) => [result.failure, ...prev]);
     fetchStats();
     setActiveTab('today');
@@ -354,6 +354,9 @@ function MainApp() {
                   similarFailures={todaySimilarFailures}
                   otherFailures={failures}
                   myTodayFailure={myTodayFailure}
+                  myFailures={myFailures}
+                  deviceId={deviceId}
+                  userId={user?.id}
                   similarCount={todaySimilarCount}
                   onReaction={handleReaction}
                   onReport={(id) => setReportingFailureId(id)}

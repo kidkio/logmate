@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { failureStore } from '@/lib/storage';
+import { failureStore, isFailureOwnedBy } from '@/lib/storage';
 import { getUserBySession } from '@/lib/user-store';
 import { getEmbedding, analyzeFailure } from '@/lib/gemini';
 import { CategoryType } from '@/types';
@@ -11,9 +11,18 @@ export async function GET(req: NextRequest) {
     const category = (searchParams.get('category') as CategoryType) || '전체';
     const sort = (searchParams.get('sort') as 'latest' | 'popular') || 'latest';
     const deviceId = searchParams.get('deviceId') || undefined;
+    let userId = searchParams.get('userId') || undefined;
+
+    const token = req.cookies.get('logmate_token')?.value;
+    if (token && !userId) {
+      const user = await getUserBySession(token);
+      if (user) userId = user.id;
+    }
 
     const failures = await failureStore.getAll(deviceId, category, sort);
-    return NextResponse.json({ success: true, failures });
+    // 피드 목록 반환 시 요청자의 본인 사연은 제외하여 타 이웃의 사연만 온전히 노출
+    const filtered = failures.filter((f) => !isFailureOwnedBy(f, deviceId, userId));
+    return NextResponse.json({ success: true, failures: filtered });
   } catch (error: any) {
     console.error('Failed to get failures:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

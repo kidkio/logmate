@@ -31,24 +31,14 @@ export function getToday3AMKSTCutoff(): Date {
   return new Date(kstCutoffUtcTime);
 }
 
-// 사연 소유권 판별 (게스트와 정식 회원 계정 간의 사연 유출 철저 차단)
-function isFailureOwnedBy(f: Failure, deviceId?: string, userId?: string): boolean {
-  // 1. 등록된 정식 회원(이메일, 카카오, 구글)이 작성한 글인 경우
-  if (f.userId && !f.userId.startsWith('usr_guest_')) {
-    // 오직 해당 회원 본인 계정으로 로그인했을 때만 본인 글로 판정 (게스트나 타 회원에게 절대 노출 금지)
-    return Boolean(userId && f.userId === userId);
+// 사연 소유권 판별 (게스트와 정식 회원 계정 간의 사연 유출 철저 차단 및 작성자 본인 식별)
+export function isFailureOwnedBy(f: Failure, deviceId?: string, userId?: string): boolean {
+  if (userId && f.userId && f.userId === userId) {
+    return true;
   }
-
-  // 2. 특정 게스트 세션이 작성한 글인 경우
-  if (f.userId && f.userId.startsWith('usr_guest_')) {
-    return Boolean(userId && f.userId === userId);
+  if (deviceId && f.deviceId && f.deviceId === deviceId) {
+    return true;
   }
-
-  // 3. 비로그인 익명 기기로 작성된 글인 경우 (deviceId 대조)
-  if (!f.userId) {
-    return Boolean(deviceId && f.deviceId === deviceId);
-  }
-
   return false;
 }
 
@@ -218,7 +208,10 @@ class FailureStore {
     await this.init();
     const cutoff = getToday3AMKSTCutoff();
     const all = Array.from(this.failures.values()).filter(
-      (f) => !f.isBlinded && f.id !== targetFailure.id
+      (f) =>
+        !f.isBlinded &&
+        f.id !== targetFailure.id &&
+        !isFailureOwnedBy(f, targetFailure.deviceId, targetFailure.userId)
     );
 
     // 새벽 3시 이후 글 우선 필터링
@@ -290,6 +283,11 @@ class FailureStore {
       categoryCount,
       aiPeerStory,
     };
+  }
+
+  async getFailure(failureId: string): Promise<Failure | undefined> {
+    await this.init();
+    return this.failures.get(failureId);
   }
 
   async addReaction(failureId: string, deviceId: string, reactionType: ReactionType): Promise<ReactionCounts> {

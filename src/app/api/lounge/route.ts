@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { getUserCount } from '@/lib/user-store';
 
 interface WhisperItem {
   id: string;
@@ -90,16 +91,30 @@ function recordPresence(req: NextRequest, clientKey?: string): number {
   return Math.max(1, activePresenceMap.size);
 }
 
+// 회원수와 동시 접속자 수에 비례하여 적절히 상향 조절되는 은하수 마일스톤 목표 산출
+export function calculateMilestoneGoal(memberCount: number, activeCount: number): number {
+  const effectiveMembers = Math.max(memberCount, 12);
+  const base = 2500;
+  const memberAddition = effectiveMembers * 60;
+  const activeAddition = activeCount * 80;
+  const raw = base + memberAddition + activeAddition;
+  return Math.max(2500, Math.ceil(raw / 100) * 100);
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const deviceId = searchParams.get('deviceId') || undefined;
   const activeCount = recordPresence(req, deviceId);
+  const memberCount = await getUserCount();
+  const milestoneGoal = calculateMilestoneGoal(memberCount, activeCount);
 
   const data = await getLoungeData();
   return NextResponse.json({
     success: true,
     candleCount: data.candleCount,
     activeCount,
+    memberCount,
+    milestoneGoal,
     whispers: data.whispers,
     recentEvents: data.recentEvents || [],
   });
@@ -109,12 +124,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const activeCount = recordPresence(req, body.deviceId);
+    const memberCount = await getUserCount();
+    const milestoneGoal = calculateMilestoneGoal(memberCount, activeCount);
     const data = await getLoungeData();
 
     if (body.action === 'heartbeat') {
       return NextResponse.json({ 
         success: true, 
         activeCount, 
+        memberCount,
+        milestoneGoal,
         candleCount: data.candleCount,
         recentEvents: data.recentEvents || [],
       });

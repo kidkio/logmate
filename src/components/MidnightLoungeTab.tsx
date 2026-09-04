@@ -25,6 +25,12 @@ import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
 import { TarotModal } from './TarotModal';
 import { UnlockedSimilarModal } from './UnlockedSimilarModal';
+import {
+  getTodayBlessing,
+  isBlessingClaimed,
+  claimBlessing,
+  DailyBlessing,
+} from '@/lib/dailyBlessings';
 
 export interface WarmthEvent {
   id: string;
@@ -85,12 +91,22 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
   const [cooldownStatus, setCooldownStatus] = useState<CooldownStatus>(() => getCooldownStatus(user?.id));
   const [boosterStatus, setBoosterStatus] = useState<BoosterStatus>(() => getBoosterStatus(user?.id));
 
-  // 유저 변경 시 해당 유저의 온기/레벨/쿨타임/부스터 즉시 재동기화
+  // 회원수·접속자 연동 동적 마일스톤 목표 & 오늘의 은하수 축복 상태
+  const [milestoneGoal, setMilestoneGoal] = useState<number>(3500);
+  const [memberCount, setMemberCount] = useState<number>(15);
+  const [todayBlessing, setTodayBlessing] = useState<DailyBlessing>(() => getTodayBlessing());
+  const [isBlessingClaimedToday, setIsBlessingClaimedToday] = useState<boolean>(false);
+  const [showBlessingModal, setShowBlessingModal] = useState<boolean>(false);
+
+  // 유저 변경 시 해당 유저의 온기/레벨/쿨타임/부스터/축복수령여부 즉시 재동기화
   useEffect(() => {
     const stored = getStoredWarmth(user?.id);
     setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
     setCooldownStatus(getCooldownStatus(user?.id));
     setBoosterStatus(getBoosterStatus(user?.id));
+    const blessing = getTodayBlessing();
+    setTodayBlessing(blessing);
+    setIsBlessingClaimedToday(isBlessingClaimed(blessing.id, user?.id));
   }, [user?.id]);
 
   // 1초 주기로 쿨타임 및 피버 부스터 카운트다운 갱신
@@ -154,6 +170,8 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
       if (data.success) {
         setCandleCount(data.candleCount);
         setActiveCount(data.activeCount);
+        if (data.milestoneGoal) setMilestoneGoal(data.milestoneGoal);
+        if (data.memberCount) setMemberCount(data.memberCount);
         setWhispers(data.whispers || []);
         if (data.recentEvents && data.recentEvents.length > 0) {
           setRecentEvents(data.recentEvents);
@@ -194,6 +212,24 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
     setTimeout(() => {
       setShootingStars((prev) => prev.filter((s) => !newStars.some((ns) => ns.id === s.id)));
     }, 1200);
+  };
+
+  // 오늘의 은하수 축복 수령 핸들러
+  const handleClaimBlessing = () => {
+    const res = claimBlessing(todayBlessing, user?.id);
+    if (res.success) {
+      setIsBlessingClaimedToday(true);
+      triggerShootingStars();
+      soundscape.playCandleChime(7);
+      const updated = getStoredWarmth(user?.id);
+      setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
+      setShowBlessingModal(true);
+      setToastMessage(res.message);
+      setTimeout(() => setToastMessage(null), 4500);
+    } else {
+      setToastMessage(res.message);
+      setTimeout(() => setToastMessage(null), 2500);
+    }
   };
 
   // 촛불 켜기 액션 (하이엔드 리플 + 연타 콤보 멜로디 + 즉각적 체온 상승 + 행운의 위로 카드)
@@ -467,45 +503,48 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
     Number(warmthDegree) >= 37.2 ? '훈훈한 모닥불 온기 ♨️' :
     Number(warmthDegree) >= 36.5 ? '사람의 포근한 체온 💛' : '선선한 새벽 공기 🌙';
 
-  // 오늘 밤 커뮤니티 온기 마일스톤 목표 (기본 2,000 온기)
-  const milestoneGoal = 2000;
+  // 오늘 밤 커뮤니티 온기 마일스톤 목표 (회원수·접속자 연동 동적 산출)
   const milestonePercent = Math.min(100, Math.round((candleCount / milestoneGoal) * 100));
   const isGoalAchieved = candleCount >= milestoneGoal;
+  const tier1Goal = Math.round(milestoneGoal * 0.3);
+  const tier2Goal = Math.round(milestoneGoal * 0.65);
+  const tier3Goal = milestoneGoal;
 
   return (
     <div className="relative w-full h-full flex-1 overflow-y-auto space-y-4 px-1 pb-28 pt-1 text-slate-100 select-none no-scrollbar">
-      {/* 0. 오늘 밤하늘 목표(2000 온기) 100% 달성 시 밤하늘 전체에 개화하는 은하수 오로라 & 별빛 배경 */}
+      {/* 0. 오늘 밤하늘 목표 달성 시 밤하늘 전체에 개화하는 은하수 오로라 & 별빛 배경 */}
       {isGoalAchieved && (
         <div className="absolute inset-0 pointer-events-none -z-10 overflow-hidden rounded-3xl">
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-[550px] h-80 bg-gradient-to-b from-purple-600/30 via-indigo-600/20 to-transparent rounded-full blur-3xl animate-pulse duration-3000" />
-          <div className="absolute top-1/4 -left-12 w-60 h-60 bg-teal-500/15 rounded-full blur-3xl" />
-          <div className="absolute top-1/3 -right-12 w-60 h-60 bg-pink-500/15 rounded-full blur-3xl" />
-          <div className="absolute inset-0 bg-[radial-gradient(#e0e7ff_1px,transparent_1px)] [background-size:22px_22px] opacity-20" />
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-[650px] h-[450px] bg-gradient-to-b from-purple-600/40 via-indigo-600/30 to-teal-500/15 rounded-full blur-3xl animate-[pulse_4s_ease-in-out_infinite]" />
+          <div className="absolute top-1/4 -left-16 w-72 h-72 bg-teal-400/25 rounded-full blur-3xl animate-pulse delay-500" />
+          <div className="absolute top-1/3 -right-16 w-72 h-72 bg-pink-500/25 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute bottom-1/4 left-1/3 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(#e0e7ff_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-35" />
         </div>
       )}
 
       {/* 0-1. 은하수 목표 100% 개화 축하 스페셜 엠블럼 배너 */}
       {isGoalAchieved && (
-        <div className="w-full p-4 rounded-3xl bg-gradient-to-r from-purple-950/90 via-slate-900/95 to-indigo-950/90 border border-purple-400/60 shadow-[0_0_35px_rgba(168,85,247,0.35)] relative overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-amber-500/10 animate-pulse" />
+        <div className="w-full p-4 rounded-3xl bg-gradient-to-r from-purple-950/95 via-indigo-950/95 to-amber-950/90 border border-purple-400/70 shadow-[0_0_40px_rgba(168,85,247,0.45)] relative overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/15 via-pink-500/15 to-amber-500/15 animate-pulse" />
           <div className="relative z-10 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500 via-indigo-500 to-amber-400 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(216,180,254,0.6)] flex-shrink-0 animate-bounce">
+            <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-purple-500 via-indigo-500 to-amber-400 flex items-center justify-center text-3xl shadow-[0_0_25px_rgba(216,180,254,0.7)] flex-shrink-0 animate-bounce">
               🌌
             </div>
             <div className="space-y-0.5 text-left flex-1 min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-2 py-0.5 rounded-full bg-purple-500/30 border border-purple-400/50 text-[10px] font-black text-purple-200">
-                  ✨ 오늘 밤하늘 목표 100% 달성 완료!
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/30 border border-purple-400/60 text-[10px] font-black text-purple-200 shadow-sm">
+                  ✨ 은하수 개화 축복 100% 발동!
                 </span>
-                <span className="text-[10px] text-amber-300 font-bold">
-                  은하수 개화 축복 발동 중
+                <span className="text-[10px] text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-500/30">
+                  {todayBlessing.badge}
                 </span>
               </div>
               <h4 className="text-xs sm:text-sm font-black text-slate-100 truncate">
-                이웃들의 온기가 모여 밤하늘이 환하게 밝아졌습니다
+                {todayBlessing.title}
               </h4>
               <p className="text-[10px] sm:text-[11px] text-slate-300 leading-tight">
-                오늘 밤 라운지 방문자 전원에게 <strong>은하수 오로라 밤하늘 테마</strong>와 <strong>별빛 축복</strong>이 적용됩니다 🌟
+                {todayBlessing.buffDescription}
               </p>
             </div>
           </div>
@@ -520,7 +559,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
             <span className="text-xs font-bold text-slate-200">심야 라이브 온기</span>
           </div>
           <p className="text-[11px] text-slate-400">
-            지금 밤하늘 아래 실제 <span className="text-indigo-300 font-bold font-mono">{activeCount}명</span>의 이웃이 함께 머무르고 있어요.
+            지금 밤하늘 아래 라이브 <span className="text-indigo-300 font-bold font-mono">{activeCount}명</span> · 총 <span className="text-amber-300 font-bold font-mono">{memberCount}명</span>의 이웃이 함께 머무르고 있어요.
           </p>
         </div>
 
@@ -567,7 +606,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
             ) : (
               <>
                 <Target className="w-4 h-4 text-amber-400" />
-                <span className="font-bold text-slate-200">오늘 밤하늘 목표: 2,000 온기</span>
+                <span className="font-bold text-slate-200">오늘 밤하늘 목표: {milestoneGoal.toLocaleString()} 온기</span>
               </>
             )}
           </div>
@@ -576,7 +615,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
               {candleCount.toLocaleString()}
             </span>
             <span className={isGoalAchieved ? 'text-purple-400 font-semibold' : 'text-slate-500 font-normal'}>
-              / 2,000 ({milestonePercent}% {isGoalAchieved ? '완료' : ''})
+              / {milestoneGoal.toLocaleString()} ({milestonePercent}% {isGoalAchieved ? '완료' : ''})
             </span>
           </div>
         </div>
@@ -595,32 +634,103 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           </div>
         </div>
 
-        {/* 마일스톤 3단계 뱃지 */}
+        {/* 마일스톤 3단계 뱃지 (회원수·접속자 연동 동적 산출) */}
         <div className="grid grid-cols-3 gap-1 pt-1 text-[10px]">
           <div className={`p-1.5 rounded-lg border text-center transition-all ${
-            candleCount >= 500
+            candleCount >= tier1Goal
               ? 'bg-amber-950/60 border-amber-500/40 text-amber-200'
               : 'bg-white/[0.02] border-white/[0.05] text-slate-500'
           }`}>
-            <span className="block font-bold">500 온기</span>
-            <span className="text-[9px]">🌙 새벽 미명 {candleCount >= 500 ? '✓' : ''}</span>
+            <span className="block font-bold">{tier1Goal.toLocaleString()} 온기</span>
+            <span className="text-[9px]">🌙 새벽 미명 {candleCount >= tier1Goal ? '✓' : ''}</span>
           </div>
           <div className={`p-1.5 rounded-lg border text-center transition-all ${
-            candleCount >= 1000
+            candleCount >= tier2Goal
               ? 'bg-amber-950/60 border-amber-500/40 text-amber-200'
               : 'bg-white/[0.02] border-white/[0.05] text-slate-500'
           }`}>
-            <span className="block font-bold">1,000 온기</span>
-            <span className="text-[9px]">🕯️ 모닥불 {candleCount >= 1000 ? '✓' : ''}</span>
+            <span className="block font-bold">{tier2Goal.toLocaleString()} 온기</span>
+            <span className="text-[9px]">🕯️ 모닥불 {candleCount >= tier2Goal ? '✓' : ''}</span>
           </div>
           <div className={`p-1.5 rounded-lg border text-center transition-all ${
-            candleCount >= 2000
+            candleCount >= tier3Goal
               ? 'bg-purple-950/80 border-purple-400/70 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.5)] font-bold'
               : 'bg-amber-500/10 border-amber-500/30 text-amber-300 animate-pulse'
           }`}>
-            <span className="block font-bold">2,000 온기</span>
-            <span className="text-[9px]">🌟 은하수 {candleCount >= 2000 ? '개화 완료! ✓' : '보너스+50'}</span>
+            <span className="block font-bold">{tier3Goal.toLocaleString()} 온기</span>
+            <span className="text-[9px]">🌟 은하수 {candleCount >= tier3Goal ? '개화 완료! ✓' : `보너스+${todayBlessing.rewardAmount}`}</span>
           </div>
+        </div>
+      </div>
+
+      {/* 1-4. [오늘의 은하수 축복 & 데일리 목표 보상 카드] (매일 랜덤/순환 교체) */}
+      <div className={`glass-card rounded-2xl p-4 border transition-all duration-500 relative overflow-hidden ${
+        isGoalAchieved
+          ? `bg-gradient-to-br ${todayBlessing.gradient} ${todayBlessing.border} ${todayBlessing.glow}`
+          : 'bg-gradient-to-br from-indigo-950/30 via-slate-900/50 to-purple-950/30 border-white/[0.08]'
+      }`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-2xl border flex-shrink-0 shadow-md ${
+              isGoalAchieved
+                ? 'bg-purple-500/30 border-purple-400/50 shadow-purple-500/30 animate-bounce'
+                : 'bg-white/[0.04] border-white/[0.08]'
+            }`}>
+              {todayBlessing.icon}
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  {todayBlessing.dayName}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  isGoalAchieved
+                    ? 'bg-purple-500/30 text-purple-200 border-purple-400/50 animate-pulse'
+                    : 'bg-white/[0.05] text-slate-400 border-white/10'
+                }`}>
+                  {isGoalAchieved ? '✨ 은하수 축복 개화 완료' : '🔒 목표 달성 시 해금'}
+                </span>
+              </div>
+              <h4 className="text-xs sm:text-sm font-black text-slate-100 flex items-center gap-1.5">
+                <span>{todayBlessing.title}</span>
+              </h4>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {todayBlessing.description}
+              </p>
+              <p className="text-[10px] text-amber-300/90 font-medium">
+                🎁 보상 혜택: <strong>{todayBlessing.rewardLabel}</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 축복 수령 / 상태 버튼 */}
+        <div className="mt-3 pt-2.5 border-t border-white/[0.08] flex items-center justify-between">
+          <span className="text-[10px] text-slate-400">
+            {isGoalAchieved
+              ? '오늘 밤 3시까지 모든 안식처 이웃에게 적용됩니다'
+              : `목표까지 ${Math.max(0, milestoneGoal - candleCount).toLocaleString()} 온기 남음`}
+          </span>
+
+          {isGoalAchieved ? (
+            isBlessingClaimedToday ? (
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/30">
+                <span>✓ 축복 수령 완료 (적용 중)</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleClaimBlessing}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-black text-white bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 hover:opacity-90 active:scale-95 shadow-lg shadow-purple-500/30 transition-all flex items-center gap-1.5 animate-pulse"
+              >
+                <span>🎁 축복 수령하기</span>
+              </button>
+            )
+          ) : (
+            <span className="text-[10px] font-mono font-semibold text-slate-500 bg-white/[0.03] px-2.5 py-1 rounded-lg border border-white/[0.06]">
+              달성률 {milestonePercent}%
+            </span>
+          )}
         </div>
       </div>
 
@@ -712,6 +822,16 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           </div>
         ))}
 
+        {/* 은하수 개화 축복 활성화 엠블럼 */}
+        {isGoalAchieved && (
+          <div className="mb-2 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500/30 via-indigo-500/30 to-amber-500/30 border border-purple-400/50 shadow-[0_0_20px_rgba(168,85,247,0.5)] flex items-center gap-1.5 animate-pulse select-none">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+            <span className="text-[10px] font-extrabold text-purple-200">
+              은하수 개화 축복 발동 중 🌌
+            </span>
+          </div>
+        )}
+
         {/* 실감나는 멀티레이어 SVG 촛불 비주얼 (쿨타임 시 클릭 불가 및 휴식 모드 전환) */}
         <div
           onClick={!boosterStatus.isActive && cooldownStatus.inCooldown ? undefined : handleLightCandle}
@@ -738,7 +858,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
                 : cooldownStatus.inCooldown
                 ? 'bg-indigo-950/40 blur-xl opacity-40'
                 : isGoalAchieved
-                ? 'bg-gradient-to-tr from-purple-500/40 via-amber-400/40 to-teal-400/30 blur-2xl animate-pulse'
+                ? 'bg-gradient-to-tr from-purple-500/50 via-amber-400/50 to-teal-400/40 blur-3xl animate-[pulse_2s_ease-in-out_infinite]'
                 : 'bg-gradient-to-tr from-amber-500/40 via-orange-500/30 to-transparent blur-2xl group-hover:blur-3xl animate-pulse'
             }`}
           />
@@ -751,8 +871,19 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
                 ? 'animate-bounce scale-110'
                 : cooldownStatus.inCooldown
                 ? 'scale-90 opacity-60'
+                : isGoalAchieved
+                ? 'animate-bounce scale-105'
                 : 'animate-bounce'
             }`}>
+              {/* 은하수 개화 시 불꽃 주위를 회전하는 천상의 별빛 궤도 */}
+              {isGoalAchieved && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full border border-purple-400/50 animate-[spin_12s_linear_infinite] pointer-events-none flex items-center justify-center shadow-[0_0_20px_rgba(168,85,247,0.5)]">
+                  <span className="text-[10px] absolute -top-1">✨</span>
+                  <span className="text-[10px] absolute -bottom-1">🌟</span>
+                  <span className="text-[10px] absolute -left-1">💫</span>
+                  <span className="text-[10px] absolute -right-1">⭐</span>
+                </div>
+              )}
               <svg
                 viewBox="0 0 64 90"
                 className={`w-14 h-20 filter ${
@@ -1341,7 +1472,8 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
               setUnlockedFailures(data.unlockedFailures);
               setIsUnlockedModalOpen(true);
               if (typeof window !== 'undefined') {
-                localStorage.setItem('logmate_unlocked_stories', JSON.stringify(data.unlockedFailures));
+                const unlockedKey = `logmate_unlocked_stories_${user?.id || deviceId || 'guest'}`;
+                localStorage.setItem(unlockedKey, JSON.stringify(data.unlockedFailures));
               }
               setToastMessage('🔓 숨겨진 공감 사연 3편이 성공적으로 해금되었습니다!');
             } else {
@@ -1421,6 +1553,51 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           }
         }}
       />
+
+      {/* 9-1. 은하수 개화 축복 축하 및 보상 수령 모달 */}
+      {showBlessingModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="glass-card max-w-sm w-full p-6 rounded-3xl border border-purple-400/60 text-center space-y-4 shadow-[0_0_60px_rgba(168,85,247,0.4)] relative overflow-hidden animate-in zoom-in-95">
+            <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 via-amber-500/10 to-teal-500/10 pointer-events-none" />
+            
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-purple-500 via-indigo-500 to-amber-400 flex items-center justify-center text-3xl shadow-[0_0_30px_rgba(168,85,247,0.6)] animate-bounce">
+              {todayBlessing.icon}
+            </div>
+
+            <div className="space-y-1.5 relative z-10">
+              <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/50">
+                🌌 {todayBlessing.dayName}
+              </span>
+              <h3 className="text-base font-black text-slate-100">
+                {todayBlessing.title}
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed pt-1">
+                이웃들의 따뜻한 온기가 모여 오늘 밤하늘 목표를 완벽히 달성했습니다!<br />
+                은하수 개화 축복 보상이 당신의 안식처에 깃들었습니다.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-black/40 border border-purple-500/30 text-left space-y-1 font-mono text-xs">
+              <div className="text-[10px] text-purple-300 font-sans font-bold">수령된 은하수 보상:</div>
+              <div className="text-amber-300 font-bold flex items-center gap-1.5">
+                <span>✨</span>
+                <span>{todayBlessing.rewardLabel}</span>
+              </div>
+              <div className="text-[10px] text-slate-400 font-sans pt-0.5">
+                {todayBlessing.buffDescription}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowBlessingModal(false)}
+              className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 active:scale-95 transition-all shadow-md shadow-purple-600/30"
+            >
+              은하수 축복과 함께 머무르기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 10. 알림 토스트 */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />

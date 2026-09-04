@@ -33,6 +33,9 @@ interface FailureShortsFeedProps {
   similarFailures: Failure[];
   otherFailures: Failure[];
   myTodayFailure: Failure | null;
+  myFailures?: Failure[];
+  deviceId?: string;
+  userId?: string;
   similarCount: number;
   onReaction: (failureId: string, type: ReactionType) => void;
   onReport: (failureId: string) => void;
@@ -149,6 +152,9 @@ export function FailureShortsFeed({
   similarFailures,
   otherFailures,
   myTodayFailure,
+  myFailures = [],
+  deviceId,
+  userId,
   onReaction,
   onReport,
   hasPass,
@@ -160,10 +166,13 @@ export function FailureShortsFeed({
   const [unlockedBonusFailures, setUnlockedBonusFailures] = useState<Failure[]>([]);
   const [isUnlockedModalOpen, setIsUnlockedModalOpen] = useState(false);
 
+  // 계정별 격리된 해금 사연 스토리지 키
+  const storageKey = `logmate_unlocked_stories_${userId || deviceId || 'guest'}`;
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('logmate_unlocked_stories');
+        const stored = localStorage.getItem(storageKey);
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -174,23 +183,39 @@ export function FailureShortsFeed({
         console.error('Failed to parse unlocked stories:', e);
       }
     }
-  }, []);
+  }, [storageKey]);
 
-  // 1. 알고리즘 기반 피드 구성
-  const topSimilar = similarFailures.slice(0, 3);
+  // 본인 작성 사연 철저 식별 (오늘 사연, 내 보관함 전체 사연, 기기/계정 일치 사연 모두 제외)
+  const isMyStory = useCallback(
+    (f: Failure) => {
+      if (!f) return false;
+      if (myTodayFailure && f.id === myTodayFailure.id) return true;
+      if (myFailures && myFailures.some((mf) => mf.id === f.id)) return true;
+      if (userId && f.userId && f.userId === userId) return true;
+      if (deviceId && f.deviceId && f.deviceId === deviceId) return true;
+      return false;
+    },
+    [myTodayFailure, myFailures, userId, deviceId]
+  );
+
+  // 1. 알고리즘 기반 피드 구성 (본인 사연 절대 배제)
+  const topSimilar = similarFailures.filter((f) => !isMyStory(f)).slice(0, 3);
+  const validUnlockedBonus = unlockedBonusFailures.filter(
+    (f) => !isMyStory(f) && !topSimilar.some((ts) => ts.id === f.id)
+  );
   const others = otherFailures.filter(
     (f) =>
-      (!myTodayFailure || f.id !== myTodayFailure.id) &&
+      !isMyStory(f) &&
       !topSimilar.some((sf) => sf.id === f.id) &&
-      !unlockedBonusFailures.some((ub) => ub.id === f.id)
+      !validUnlockedBonus.some((ub) => ub.id === f.id)
   );
 
   const items: FeedItem[] = [];
 
-  if (topSimilar.length === 0 && others.length === 0 && unlockedBonusFailures.length === 0) {
+  if (topSimilar.length === 0 && others.length === 0 && validUnlockedBonus.length === 0) {
     items.push({ type: 'empty' });
   } else {
-    // [단계 1] 나와 가장 닮은 상위 사연 (기본 3편)
+    // [단계 1] 나와 가장 닮은 상위 사연 (기본 3편, 타 이웃의 사연만)
     topSimilar.forEach((failure, idx) => {
       items.push({
         type: 'similar',
@@ -200,7 +225,7 @@ export function FailureShortsFeed({
     });
 
     // [단계 1-2] 온기/광고로 잠금 해제된 숨겨진 공감 사연 (추가 3편)
-    unlockedBonusFailures.forEach((failure, idx) => {
+    validUnlockedBonus.forEach((failure, idx) => {
       items.push({
         type: 'unlocked_bonus',
         failure,
@@ -209,7 +234,7 @@ export function FailureShortsFeed({
     });
 
     // [단계 2] 유사 사연 3종 직후 광고 (패스 미보유 시): 구글 애드센스 네이티브 인피드
-    if (!hasPass && (topSimilar.length > 0 || unlockedBonusFailures.length > 0)) {
+    if (!hasPass && (topSimilar.length > 0 || validUnlockedBonus.length > 0)) {
       items.push({ type: 'ad_adsense' });
     }
 
@@ -820,15 +845,17 @@ export function FailureShortsFeed({
         onRewardClaimed={async () => {
           try {
             const params = new URLSearchParams();
-            if (myTodayFailure?.deviceId) params.set('deviceId', myTodayFailure.deviceId);
-            if (myTodayFailure?.userId) params.set('userId', myTodayFailure.userId);
+            const targetDevId = myTodayFailure?.deviceId || deviceId;
+            const targetUid = myTodayFailure?.userId || userId;
+            if (targetDevId) params.set('deviceId', targetDevId);
+            if (targetUid) params.set('userId', targetUid);
             const res = await fetch(`/api/failures/unlocked-similar?${params.toString()}`);
             const data = await res.json();
             if (data.success && data.unlockedFailures?.length > 0) {
               setUnlockedBonusFailures(data.unlockedFailures);
               setIsUnlockedModalOpen(true);
               if (typeof window !== 'undefined') {
-                localStorage.setItem('logmate_unlocked_stories', JSON.stringify(data.unlockedFailures));
+                localStorage.setItem(storageKey, JSON.stringify(data.unlockedFailures));
               }
               setToastMessage('🎉 보상 획득! 숨겨진 공감 사연 3편이 즉시 열렸습니다 🔓');
             } else {
