@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Flame, Sparkles, Volume2, VolumeX, Moon, Heart, Send, Waves, Wind, CloudRain, Clock, ThermometerSun, ExternalLink, Sliders } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Flame, Sparkles, Volume2, VolumeX, Moon, Heart, Send, Waves, Wind, CloudRain, Clock, ThermometerSun, ExternalLink, Sliders, Target, Trophy, Compass, Star, TrendingUp } from 'lucide-react';
 import { soundscape, SOUND_CHANNELS, SOUND_PRESETS, SoundChannel, SoundPreset } from '@/lib/soundscape';
 import { User } from '@/types';
 import { RewardedAdModal } from './RewardedAdModal';
@@ -24,6 +24,14 @@ import {
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
 import { TarotModal } from './TarotModal';
+
+export interface WarmthEvent {
+  id: string;
+  nickname: string;
+  amount: number;
+  type: 'candle' | 'fever' | 'bonus' | 'milestone' | 'whisper';
+  createdAt: string;
+}
 
 interface WhisperItem {
   id: string;
@@ -106,6 +114,26 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   });
   const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
 
+  // 실시간 참여 유도 & 온기 지수 반응 상태
+  const [recentEvents, setRecentEvents] = useState<WarmthEvent[]>([]);
+  const [comboCount, setComboCount] = useState(0);
+  const [comboMessage, setComboMessage] = useState<string | null>(null);
+  const [shootingStars, setShootingStars] = useState<{ id: number; top: number; right: number }[]>([]);
+  const [localTempBoost, setLocalTempBoost] = useState(0);
+  const [tempSurgeActive, setTempSurgeActive] = useState(false);
+  const [todayContribution, setTodayContribution] = useState<number>(0);
+  const [luckyWhisper, setLuckyWhisper] = useState<{ text: string; bonus?: number } | null>(null);
+  const comboTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 오늘 내가 밝힌 온기 로컬 로드
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const key = `logmate_today_contrib_${todayStr}_${user?.id || 'guest'}`;
+      setTodayContribution(parseInt(localStorage.getItem(key) || '0', 10));
+    }
+  }, [user?.id]);
+
   // 사운드스케이프 전역 상태 구독
   useEffect(() => {
     const unsub = soundscape.subscribe((channels) => setActiveChannels(channels));
@@ -121,6 +149,9 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         setCandleCount(data.candleCount);
         setActiveCount(data.activeCount);
         setWhispers(data.whispers || []);
+        if (data.recentEvents && data.recentEvents.length > 0) {
+          setRecentEvents(data.recentEvents);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch lounge data:', e);
@@ -145,19 +176,55 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
     return () => clearTimeout(timer);
   }, [sleepTimerMinutes]);
 
-  // 촛불 켜기 액션 (하이엔드 리플 + 싱잉볼 사운드 + 부유하는 온기 스파크)
-  const handleLightCandle = async () => {
-    // 1. 크리스탈 싱잉볼/차임벨 음향 재생
-    soundscape.playCandleChime();
+  // 별똥별 파티클 발동 함수
+  const triggerShootingStars = () => {
+    const starId = Date.now();
+    const newStars = [
+      { id: starId + 1, top: 10, right: 12 },
+      { id: starId + 2, top: 28, right: 35 },
+      { id: starId + 3, top: 18, right: 55 },
+    ];
+    setShootingStars((prev) => [...prev, ...newStars]);
+    setTimeout(() => {
+      setShootingStars((prev) => prev.filter((s) => !newStars.some((ns) => ns.id === s.id)));
+    }, 1200);
+  };
 
-    // 2. 햅틱 진동
+  // 촛불 켜기 액션 (하이엔드 리플 + 연타 콤보 멜로디 + 즉각적 체온 상승 + 행운의 위로 카드)
+  const handleLightCandle = async () => {
+    // 1. 햅틱 진동
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(35);
     }
 
-    // 3. 리플 활성화
+    // 2. 리플 활성화
     setRippleActive(true);
     setTimeout(() => setRippleActive(false), 1200);
+
+    // 3. 연타 콤보 계산 & 맑은 펜타토닉 음계 연주
+    if (comboTimerRef.current) {
+      clearTimeout(comboTimerRef.current);
+    }
+    const nextCombo = comboCount + 1;
+    setComboCount(nextCombo);
+    soundscape.playCandleChime(nextCombo);
+
+    if (nextCombo === 3) {
+      setComboMessage('🔥 3연타 온기 콤보! 불꽃이 더 영롱해집니다.');
+    } else if (nextCombo === 5) {
+      setComboMessage('✨ 5 COMBO! 밤하늘에 따스한 온기가 가득합니다.');
+    } else if (nextCombo === 7) {
+      setComboMessage('🌠 7 COMBO! 밤하늘에 별똥별이 쏟아집니다!');
+      triggerShootingStars();
+    } else if (nextCombo >= 10 && nextCombo % 5 === 0) {
+      setComboMessage(`🎆 ${nextCombo} MAX COMBO! 전설적인 온기 장인!`);
+      triggerShootingStars();
+    }
+
+    comboTimerRef.current = setTimeout(() => {
+      setComboCount(0);
+      setComboMessage(null);
+    }, 2300);
 
     // 4. 분수처럼 솟구쳐 퍼지는 온기 파티클 생성 (피버 모드 시 화려한 불꽃 효과)
     const isFever = boosterStatus.isActive;
@@ -208,10 +275,58 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
       return;
     }
 
-    setCandleCount((prev) => prev + (warmthRes.effectiveAmount || 1));
+    const effectiveAdd = warmthRes.effectiveAmount || 1;
+    setCandleCount((prev) => prev + effectiveAdd);
     setCooldownStatus(getCooldownStatus(user?.id));
     setBoosterStatus(getBoosterStatus(user?.id));
     setWarmthProgress(calculateWarmthProgress(warmthRes.lifetime, warmthRes.spendable));
+
+    // 5. 실시간 체온 즉각 반응 (+0.1°C 또는 피버 시 +0.3°C)
+    const tempIncrement = isFever ? 0.3 : 0.1;
+    setLocalTempBoost((prev) => Math.min(6.0, Number((prev + tempIncrement).toFixed(1))));
+    setTempSurgeActive(true);
+    setTimeout(() => setTempSurgeActive(false), 900);
+
+    // 6. 오늘 내가 밝힌 온기 저장
+    if (typeof window !== 'undefined') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const key = `logmate_today_contrib_${todayStr}_${user?.id || 'guest'}`;
+      const updatedContrib = todayContribution + effectiveAdd;
+      setTodayContribution(updatedContrib);
+      localStorage.setItem(key, updatedContrib.toString());
+    }
+
+    // 7. 행운의 위로 포춘 카드 (12% 확률 발동)
+    if (Math.random() < 0.12) {
+      const comfortQuotes = [
+        { text: '오늘 하루도 충분히 애썼어요. 작은 실수에 너무 아파하지 마세요 🌿' },
+        { text: '당신의 온기가 방금 외로운 누군가의 밤을 따뜻하게 데웠습니다 💛' },
+        { text: '실패는 멈춤이 아니라, 더 멀리 도약하기 위한 웅크림일 뿐이에요 🌱' },
+        { text: '잠시 깊게 숨을 들이쉬고 내쉬어보세요. 모든 아픔은 결국 지나갑니다 🌙' },
+        { text: '서툴러도 괜찮아요. 우리 모두 이번 생은 처음 살아보는 거잖아요 🕊️' },
+        { text: '오늘 밤 흘린 눈물은 내일 당신을 더 단단하게 피워낼 거름이 됩니다 ✨' },
+        { text: '🎁 깜짝 보너스! 온기 요정이 응원의 온기 +3개를 선물했습니다!', bonus: 3 },
+      ];
+      const selectedQuote = comfortQuotes[Math.floor(Math.random() * comfortQuotes.length)];
+      if (selectedQuote.bonus) {
+        addWarmth(selectedQuote.bonus, user?.id);
+        const stored = getStoredWarmth(user?.id);
+        setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
+      }
+      setLuckyWhisper(selectedQuote);
+      setTimeout(() => setLuckyWhisper(null), 5000);
+    }
+
+    // 8. 내 활동을 로컬 실시간 온기 물결에 즉시 반영
+    const myNickname = user?.nickname || '어느 밤의 이웃';
+    const myNewEvent: WarmthEvent = {
+      id: `my_${Date.now()}`,
+      nickname: myNickname,
+      amount: effectiveAdd,
+      type: isFever ? 'fever' : 'candle',
+      createdAt: new Date().toISOString(),
+    };
+    setRecentEvents((prev) => [myNewEvent, ...prev.slice(0, 19)]);
 
     if (warmthRes.cooldownTriggered) {
       setToastMessage(`🔥 10 온기를 가득 채웠습니다! 촛불이 5분간 숨을 고릅니다.`);
@@ -225,12 +340,21 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
       const res = await fetch('/api/lounge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'candle', deviceId }),
+        body: JSON.stringify({ 
+          action: 'candle', 
+          deviceId,
+          amount: effectiveAdd,
+          isFever,
+          nickname: myNickname,
+        }),
       });
       const data = await res.json();
       if (data.success) {
         setCandleCount(data.candleCount);
         if (data.activeCount) setActiveCount(data.activeCount);
+        if (data.recentEvents && data.recentEvents.length > 0) {
+          setRecentEvents(data.recentEvents);
+        }
       }
     } catch (e) {
       console.error('Failed to light candle:', e);
@@ -316,18 +440,23 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   };
 
   // 논리적 밤하늘 온기 지수:
-  // 사람의 표준 체온(36.5°C)을 가장 이상적이고 따뜻한 포근함의 기준으로 삼고,
-  // 쌀쌀한 새벽 공기(24.5°C)에서 오늘 켜진 온기 촛불과 실시간 이웃들의 접속에 비례하여
-  // 사람의 체온처럼 포근한 온기(36.5°C ~ 38.0°C)로 따뜻하게 데워집니다.
-  const baseTemp = 24.5;
-  const candleBoost = Math.min(11.5, Math.sqrt(candleCount) * 0.32);
-  const visitorBoost = Math.min(2.5, activeCount * 0.25);
-  const warmthDegree = (baseTemp + candleBoost + visitorBoost).toFixed(1);
+  // 사람의 표준 체온(36.5°C)을 기본 안식처 온도로 삼고,
+  // 오늘 켜진 온기 촛불, 실시간 이웃들의 접속, 그리고 내가 클릭할 때마다 더해지는 실시간 온기 부스트로
+  // 36.5°C ~ 42.0°C(기적의 치유 온도)까지 실시간으로 따뜻하게 가열됩니다.
+  const baseTemp = 36.5;
+  const candleBoost = Math.min(2.5, Math.floor(candleCount / 200) * 0.15);
+  const visitorBoost = Math.min(1.0, activeCount * 0.15);
+  const warmthDegree = (baseTemp + candleBoost + visitorBoost + localTempBoost).toFixed(1);
 
   const warmthStatus =
-    Number(warmthDegree) >= 37.5 ? '훈훈한 온기 ♨️' :
-    Number(warmthDegree) >= 36.0 ? '사람의 포근한 체온 💛' :
-    Number(warmthDegree) >= 32.0 ? '은은한 온기 🕯️' : '선선한 밤하늘 🌙';
+    Number(warmthDegree) >= 39.5 ? '기적의 온기 오로라 🌟' :
+    Number(warmthDegree) >= 38.0 ? '타오르는 온기 열정 🔥' :
+    Number(warmthDegree) >= 37.2 ? '훈훈한 모닥불 온기 ♨️' :
+    Number(warmthDegree) >= 36.5 ? '사람의 포근한 체온 💛' : '선선한 새벽 공기 🌙';
+
+  // 오늘 밤 커뮤니티 온기 마일스톤 목표 (기본 2,000 온기)
+  const milestoneGoal = 2000;
+  const milestonePercent = Math.min(100, Math.round((candleCount / milestoneGoal) * 100));
 
   return (
     <div className="w-full h-full flex-1 overflow-y-auto space-y-4 px-1 pb-28 pt-1 text-slate-100 select-none no-scrollbar">
@@ -349,13 +478,125 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         </div>
       </div>
 
-      {/* 2. 중앙 온기 촛불 켜기 히어로 섹션 (실감나는 인터랙티브 캔들) */}
-      <div className="relative glass-card rounded-3xl p-6 text-center border border-amber-500/20 overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.7)] flex flex-col items-center justify-center">
+      {/* 1-2. 실시간 온기 물결 라이브 티커 */}
+      {recentEvents.length > 0 && (
+        <div className="glass-card rounded-xl px-3 py-2 border border-indigo-500/20 bg-gradient-to-r from-indigo-950/40 via-slate-900/50 to-amber-950/30 flex items-center gap-2 overflow-hidden text-[11px] shadow-sm">
+          <span className="flex-shrink-0 flex items-center gap-1 font-bold text-amber-300 text-[10px] bg-amber-950/70 border border-amber-500/40 px-1.5 py-0.5 rounded-md shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+            <span>온기 물결</span>
+          </span>
+          <div className="flex-1 truncate text-slate-300 animate-in fade-in duration-300">
+            {recentEvents[0].type === 'fever' ? (
+              <span>🔥 <strong className="text-orange-300 font-semibold">{recentEvents[0].nickname}</strong>님이 3배 피버 탭으로 밤하늘을 밝혔습니다! (+{recentEvents[0].amount} 🕯️)</span>
+            ) : recentEvents[0].type === 'whisper' ? (
+              <span>🌙 <strong className="text-pink-300 font-semibold">{recentEvents[0].nickname}</strong>님이 밤하늘에 한 줄 소망을 띄웠습니다</span>
+            ) : recentEvents[0].type === 'bonus' ? (
+              <span>🎁 <strong className="text-amber-300 font-semibold">{recentEvents[0].nickname}</strong>님이 행운의 온기 카드를 발견했습니다 (+{recentEvents[0].amount} 🌟)</span>
+            ) : (
+              <span>🕯️ <strong className="text-amber-200 font-semibold">{recentEvents[0].nickname}</strong>님이 온기 촛불을 켰습니다 (+{recentEvents[0].amount} 🕯️)</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 1-3. 오늘 밤 커뮤니티 온기 마일스톤 게이지 바 */}
+      <div className="glass-card rounded-2xl p-3.5 border border-amber-500/20 bg-gradient-to-r from-amber-950/30 via-slate-900 to-indigo-950/30 space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5">
+            <Target className="w-4 h-4 text-amber-400" />
+            <span className="font-bold text-slate-200">오늘 밤하늘 목표: 2,000 온기</span>
+          </div>
+          <div className="flex items-center gap-1 font-mono font-bold text-amber-300 text-xs">
+            <span>{candleCount.toLocaleString()}</span>
+            <span className="text-slate-500 font-normal">/ 2,000 ({milestonePercent}%)</span>
+          </div>
+        </div>
+
+        {/* 게이지 바 */}
+        <div className="relative w-full h-2.5 bg-slate-950/80 rounded-full overflow-hidden border border-white/10">
+          <div
+            className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 rounded-full transition-all duration-700 relative shadow-[0_0_12px_rgba(245,158,11,0.6)]"
+            style={{ width: `${milestonePercent}%` }}
+          >
+            <div className="absolute inset-0 bg-white/25 animate-pulse" />
+          </div>
+        </div>
+
+        {/* 마일스톤 3단계 뱃지 */}
+        <div className="grid grid-cols-3 gap-1 pt-1 text-[10px]">
+          <div className={`p-1.5 rounded-lg border text-center transition-all ${
+            candleCount >= 500
+              ? 'bg-amber-950/60 border-amber-500/40 text-amber-200'
+              : 'bg-white/[0.02] border-white/[0.05] text-slate-500'
+          }`}>
+            <span className="block font-bold">500 온기</span>
+            <span className="text-[9px]">🌙 새벽 미명 {candleCount >= 500 ? '✓' : ''}</span>
+          </div>
+          <div className={`p-1.5 rounded-lg border text-center transition-all ${
+            candleCount >= 1000
+              ? 'bg-amber-950/60 border-amber-500/40 text-amber-200'
+              : 'bg-white/[0.02] border-white/[0.05] text-slate-500'
+          }`}>
+            <span className="block font-bold">1,000 온기</span>
+            <span className="text-[9px]">🕯️ 모닥불 {candleCount >= 1000 ? '✓' : ''}</span>
+          </div>
+          <div className={`p-1.5 rounded-lg border text-center transition-all ${
+            candleCount >= 2000
+              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-300 animate-pulse'
+          }`}>
+            <span className="block font-bold">2,000 온기</span>
+            <span className="text-[9px]">🌟 은하수 {candleCount >= 2000 ? '개화 완료!' : '보너스+50'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 중앙 온기 촛불 켜기 히어로 섹션 (실감나는 인터랙티브 캔들 + 앰비언트 글로우) */}
+      <div className={`relative glass-card rounded-3xl p-6 text-center border overflow-hidden transition-all duration-700 flex flex-col items-center justify-center ${
+        Number(warmthDegree) >= 38.0
+          ? 'border-amber-400/50 shadow-[0_10px_45px_rgba(245,158,11,0.25)] bg-gradient-to-b from-amber-950/40 via-slate-900 to-black'
+          : 'border-amber-500/20 shadow-[0_10px_40px_rgba(0,0,0,0.7)]'
+      }`}>
         {/* 파동 리플 애니메이션 */}
         {rippleActive && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-48 h-48 rounded-full border-2 border-amber-400/80 animate-ping duration-1000" />
             <div className="w-72 h-72 rounded-full border border-pink-400/50 animate-ping duration-1000 delay-150" />
+          </div>
+        )}
+
+        {/* 별똥별 떨어짐 이펙트 (7 콤보 이상 발동) */}
+        {shootingStars.map((star) => (
+          <div
+            key={star.id}
+            className="absolute pointer-events-none w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_#ffffff] z-20"
+            style={{
+              top: `${star.top}%`,
+              right: `${star.right}%`,
+              animation: 'shootingStar 0.9s ease-out forwards',
+            }}
+          />
+        ))}
+
+        {/* 연타 콤보 플로팅 뱃지 */}
+        {comboCount >= 2 && (
+          <div className="mb-2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-black text-xs shadow-[0_0_18px_rgba(245,158,11,0.8)] animate-bounce flex items-center gap-1.5 select-none">
+            <Flame className="w-3.5 h-3.5 fill-white" />
+            <span>{comboCount} COMBO!</span>
+            {comboMessage && <span className="text-[10px] font-medium opacity-90 hidden sm:inline">| {comboMessage}</span>}
+          </div>
+        )}
+
+        {/* 행운의 위로 포춘 카드 (12% 확률로 촛불 터치 시 등장) */}
+        {luckyWhisper && (
+          <div className="w-full max-w-xs mb-3 p-3 rounded-2xl bg-gradient-to-br from-amber-950/90 via-slate-900/95 to-indigo-950/90 border border-amber-400/60 shadow-[0_0_25px_rgba(245,158,11,0.5)] text-center animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-amber-300 mb-1">
+              <Sparkles className="w-3 h-3 text-amber-400 animate-spin" />
+              <span>오늘 밤 당신에게 닿은 행운의 위로</span>
+            </div>
+            <p className="text-xs text-amber-100 font-medium leading-relaxed">
+              &ldquo;{luckyWhisper.text}&rdquo;
+            </p>
           </div>
         )}
 
@@ -396,7 +637,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           className={`relative cursor-pointer group active:scale-95 transition-all my-2 ${
             boosterStatus.isActive ? 'scale-105' : ''
           }`}
-          title={boosterStatus.isActive ? '🔥 3배 온기 피버 탭! (+3 🕯️)' : '탭하여 온기 촛불 밝히기 (맑은 벨소리가 울려요)'}
+          title={boosterStatus.isActive ? '🔥 3배 온기 피버 탭! (+3 🕯️)' : '탭하여 온기 촛불 밝히기 (연타 시 맑은 멜로디가 울려요)'}
         >
           {/* 황금빛 / 피버 화염 주변광 글로우 */}
           <div
@@ -462,7 +703,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           <p className="text-[11px] text-slate-400">
             {boosterStatus.isActive
               ? '촛불을 터치할 때마다 +3 온기가 차곡차곡 쌓입니다. 마음껏 터치하세요!'
-              : '촛불을 터치하면 맑은 싱잉볼 소리와 함께 다른 친구들에게 온기가 전해집니다.'}
+              : '촛불을 터치할 때마다 맑은 멜로디와 함께 실시간 온기 지수가 따뜻하게 데워집니다.'}
           </p>
         </div>
 
@@ -586,16 +827,32 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           </button>
         </div>
 
-        {/* 온기 지수 게이지 */}
+        {/* 온기 지수 게이지 (터치 시 실시간 온도 상승 반응) */}
         <div className="w-full max-w-xs mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
-          <div className="flex items-center gap-1 text-slate-400">
-            <ThermometerSun className="w-3.5 h-3.5 text-amber-400" />
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <div className="relative">
+              <ThermometerSun className={`w-3.5 h-3.5 ${Number(warmthDegree) >= 38 ? 'text-orange-400 animate-pulse' : 'text-amber-400'}`} />
+              {tempSurgeActive && (
+                <span className="absolute -top-3.5 -right-3 text-[9px] font-black text-amber-300 animate-bounce tracking-tighter">
+                  ▲+0.1°
+                </span>
+              )}
+            </div>
             <span>밤하늘 온기 지수</span>
           </div>
           <div className="flex items-center gap-1.5 font-bold">
             <span className="font-mono text-amber-300 text-xs">{warmthDegree}°C</span>
             <span className="text-amber-400/90 text-[10px]">({warmthStatus})</span>
           </div>
+        </div>
+
+        {/* 오늘 내가 밝힌 온기 기여도 표시 */}
+        <div className="w-full max-w-xs mt-1.5 px-3 py-1 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-between text-[10px] text-slate-400">
+          <span className="flex items-center gap-1">
+            <Star className="w-3 h-3 text-amber-400" />
+            <span>오늘 내가 피운 온기</span>
+          </span>
+          <span className="font-mono font-bold text-amber-300">🕯️ {todayContribution}개 기여</span>
         </div>
       </div>
 

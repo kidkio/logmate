@@ -9,12 +9,13 @@ services:
     container_name: logmate-web
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     env_file:
       - .env.production
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://logmate.duckdns.org}
       - OLLAMA_HOST=http://ai:11434
       - LOCAL_EMBED_MODEL=all-minilm
       - LOCAL_LLM_MODEL=qwen2.5:1.5b

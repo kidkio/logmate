@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, createUser, createSession, generateAnonymousNickname } from '@/lib/user-store';
+import { getCanonicalBaseUrl, getRedirectUri } from '@/lib/auth-url';
 
 export async function GET(req: NextRequest) {
   try {
     const code = req.nextUrl.searchParams.get('code');
     const error = req.nextUrl.searchParams.get('error');
 
-    const forwardedProto = req.headers.get('x-forwarded-proto');
-    const protocol = forwardedProto ? `${forwardedProto}:` : req.nextUrl.protocol;
-    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || req.nextUrl.host;
-    const homeUrl = `${protocol}//${host}`;
-    const redirectUri = `${homeUrl}/api/auth/callback/kakao`;
+    const homeUrl = getCanonicalBaseUrl(req);
+    const redirectUri = getRedirectUri('kakao', req);
 
     if (error || !code) {
       return NextResponse.redirect(`${homeUrl}?auth_error=kakao_canceled`);
@@ -64,7 +62,7 @@ export async function GET(req: NextRequest) {
 
     // 4. 세션 생성 및 쿠키 발급
     const token = await createSession(user.id);
-    const isSecure = protocol === 'https:' && !host.includes('158.101.157.207') && !host.includes('localhost');
+    const isSecure = homeUrl.startsWith('https:');
 
     const redirectUrl = new URL(homeUrl);
     redirectUrl.searchParams.set('auth_token', token);

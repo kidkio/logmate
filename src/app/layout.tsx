@@ -10,6 +10,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://logmate.duckdns.org'),
   title: 'LogMate (로그메이트) | 오늘 당신의 실패를 공유하세요',
   description:
     '실패를 털어놓을 가장 다정한 친구, LogMate. 오늘 하루 겪었던 실패를 털어놓고, 비슷한 실패를 경험한 친구들의 위로와 공감을 나눠보세요.',

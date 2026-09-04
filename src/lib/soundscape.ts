@@ -590,24 +590,28 @@ class SoundscapeManager {
     this.stopAll();
   }
 
-  // 촛불 차임벨
-  public playCandleChime() {
+  // 촛불 차임벨 (콤보에 따라 화음 및 옥타브 맑은 상승)
+  public playCandleChime(comboLevel: number = 1) {
     this.initContext();
     if (!this.ctx || !this.masterGain) return;
     if (this.ctx.state === 'suspended') this.ctx.resume();
 
     const t = this.ctx.currentTime;
-    const freqs = [739.99, 932.33, 1108.73];
+    // 콤보 레벨(1~10)에 따른 펜타토닉 음계 주파수 배율
+    const scaleSteps = [1.0, 1.122, 1.26, 1.335, 1.498, 1.682, 1.888, 2.0, 2.245, 2.52];
+    const pitch = scaleSteps[Math.min(Math.max(1, comboLevel) - 1, scaleSteps.length - 1)];
 
-    freqs.forEach((f, idx) => {
+    const baseFreqs = [739.99, 932.33, 1108.73];
+
+    baseFreqs.forEach((f, idx) => {
       if (!this.ctx || !this.masterGain) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.setValueAtTime(f * pitch, t);
 
-      const delay = idx * 0.04;
+      const delay = idx * 0.035;
       gain.gain.setValueAtTime(0.0001, t + delay);
       gain.gain.exponentialRampToValueAtTime(0.12 / (idx + 1), t + delay + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 1.2);
