@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /guide
+Allow: /about
+Allow: /privacy
+Allow: /terms
+Disallow: /api/
+
+Sitemap: https://logmate.duckdns.org/sitemap.xml

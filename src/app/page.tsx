@@ -18,6 +18,7 @@ import { MidnightLoungeTab } from '@/components/MidnightLoungeTab';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { getStoredWarmth, getStoredPassStatus, saveStoredPass, clearStoredPass } from '@/lib/warmthSystem';
 import { Moon, Sparkles } from 'lucide-react';
+import { AdSenseScript } from '@/components/AdSenseScript';
 
 function MainApp() {
   const { user, isLoading: authLoading } = useAuth();
@@ -322,6 +323,7 @@ function MainApp() {
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] w-full bg-black flex justify-center selection:bg-indigo-500 selection:text-white overflow-hidden">
+      <AdSenseScript />
       {/* 모바일 100dvh 뷰포트 맞춤 컨테이너 */}
       <main className="w-full max-w-md h-[100dvh] max-h-[100dvh] bg-[#030712] text-slate-100 flex flex-col justify-between relative shadow-[0_0_80px_rgba(0,0,0,0.9)] border-x border-white/[0.06] antialiased overflow-hidden">
         {/* 1. 상단 헤더 */}

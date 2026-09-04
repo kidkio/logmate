@@ -32,18 +32,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT || 'ca-pub-8699396744426469';
-
   return (
     <html lang="ko" className="dark h-full">
       <head>
-        {/* Google AdSense 사이트 소유권 메타 태그 & 공식 광고 스크립트 */}
+        {/* Google AdSense 사이트 소유권 메타 태그 */}
         <meta name="google-adsense-account" content="ca-pub-8699396744426469" />
-        <script
-          async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
-          crossOrigin="anonymous"
-        />
       </head>
       <body className="min-h-full bg-black text-slate-100 selection:bg-indigo-500 selection:text-white antialiased">
         {children}

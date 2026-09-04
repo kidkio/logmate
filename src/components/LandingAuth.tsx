@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Moon, Sparkles, ShieldCheck, Lock, Mail, ArrowRight, Dices, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
+import { Moon, Sparkles, ShieldCheck, Lock, Mail, ArrowRight, Dices, AlertCircle, Eye, EyeOff, BookOpen } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 const RANDOM_ADJECTIVES = ['이불킥하는', '토닥이는', '서투른', '야근하는', '밤샘하는', '용감한', '작심삼일', '따뜻한', '덤벙대는'];
@@ -285,20 +286,44 @@ export function LandingAuth() {
           </button>
         </form>
 
-        {/* 하단 둘러보기 & 개인정보 보호 안내 */}
+        {/* 하단 둘러보기 & 심야 쉼터 가이드 & 정책 안내 */}
         <div className="pt-4 space-y-3 relative z-10 text-center">
-          <button
-            onClick={loginGuest}
-            disabled={isLoading || isSubmitting}
-            className="text-xs text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-          >
-            <span>가입 없이 둘러보기 (게스트 체험)</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={loginGuest}
+              disabled={isLoading || isSubmitting}
+              className="w-full py-2.5 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-slate-300 hover:text-white transition-all inline-flex items-center justify-center gap-1.5 active:scale-[0.99]"
+            >
+              <span>가입 없이 둘러보기 (게스트 체험)</span>
+              <ArrowRight className="w-3.5 h-3.5 text-indigo-400" />
+            </button>
 
-          <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
+            <Link
+              href="/guide"
+              className="w-full py-2 px-3 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/20 text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-all inline-flex items-center justify-center gap-1.5"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+              <span>🌙 심야 쉼터 가이드 읽기 (마인드케어 아티클)</span>
+            </Link>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 text-[11px] text-slate-400 pt-1">
+            <Link href="/about" className="hover:text-slate-200 transition-colors">
+              서비스 소개
+            </Link>
+            <span className="text-slate-600">·</span>
+            <Link href="/privacy" className="hover:text-slate-200 transition-colors underline underline-offset-2">
+              개인정보처리방침
+            </Link>
+            <span className="text-slate-600">·</span>
+            <Link href="/terms" className="hover:text-slate-200 transition-colors">
+              이용약관
+            </Link>
+          </div>
+
+          <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 pt-0.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>비밀번호는 안전하게 암호화(Scrypt)되어 저장됩니다</span>
+            <span>100% 완전 익명 안식처 · 비밀번호 암호화(Scrypt) 보호</span>
           </div>
         </div>
       </div>
