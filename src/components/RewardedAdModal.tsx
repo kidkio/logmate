@@ -101,10 +101,12 @@ export function RewardedAdModal({
                 Google AdSense · Premium Reward
               </span>
               <h4 className="text-sm font-bold text-slate-100">
-                마인드풀 슬립테크 & 심야 힐링 사운드
+                {rewardType === 'candle' ? '30초간 온기 3배 피버 부스터 🔥' : '마인드풀 슬립테크 & 심야 힐링 사운드'}
               </h4>
               <p className="text-[11px] text-slate-400">
-                &ldquo;오늘 밤, 당신의 무거운 짐을 함께 내려놓습니다&rdquo;
+                {rewardType === 'candle'
+                  ? '광고 시청 후 30초 동안 터치할 때마다 온기 3배(+3 🕯️) 획득!'
+                  : '“오늘 밤, 당신의 무거운 짐을 함께 내려놓습니다”'}
               </p>
             </div>
           </div>
@@ -127,7 +129,7 @@ export function RewardedAdModal({
               <CheckCircle2 className="w-4 h-4 text-white" />
               <span>
                 {rewardType === 'candle'
-                  ? '온기 5배 부스터 받기 (+5 🕯️)'
+                  ? '30초 피버 부스터 시작 (+3 🕯️/탭) 🔥'
                   : '숨겨진 유사 사연 3개 열기 🔓'}
               </span>
             </button>

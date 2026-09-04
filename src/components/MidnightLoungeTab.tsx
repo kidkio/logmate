@@ -14,6 +14,9 @@ import {
   spendWarmth, 
   getCooldownStatus,
   CooldownStatus,
+  getBoosterStatus,
+  activateBooster,
+  BoosterStatus,
   saveStoredPass,
   WarmthProgress 
 } from '@/lib/warmthSystem';
@@ -65,18 +68,21 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [isTarotModalOpen, setIsTarotModalOpen] = useState(false);
   const [cooldownStatus, setCooldownStatus] = useState<CooldownStatus>(() => getCooldownStatus(user?.id));
+  const [boosterStatus, setBoosterStatus] = useState<BoosterStatus>(() => getBoosterStatus(user?.id));
 
-  // 유저 변경 시 해당 유저의 온기/레벨/쿨타임 즉시 재동기화
+  // 유저 변경 시 해당 유저의 온기/레벨/쿨타임/부스터 즉시 재동기화
   useEffect(() => {
     const stored = getStoredWarmth(user?.id);
     setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
     setCooldownStatus(getCooldownStatus(user?.id));
+    setBoosterStatus(getBoosterStatus(user?.id));
   }, [user?.id]);
 
-  // 1초 주기로 쿨타임 카운트다운 갱신
+  // 1초 주기로 쿨타임 및 피버 부스터 카운트다운 갱신
   useEffect(() => {
     const timer = setInterval(() => {
       setCooldownStatus(getCooldownStatus(user?.id));
+      setBoosterStatus(getBoosterStatus(user?.id));
     }, 1000);
     return () => clearInterval(timer);
   }, [user?.id]);
@@ -152,9 +158,22 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
     setRippleActive(true);
     setTimeout(() => setRippleActive(false), 1200);
 
-    // 4. 분수처럼 솟구쳐 퍼지는 온기 파티클 생성
+    // 4. 분수처럼 솟구쳐 퍼지는 온기 파티클 생성 (피버 모드 시 화려한 불꽃 효과)
+    const isFever = boosterStatus.isActive;
+    const multiplier = isFever ? boosterStatus.multiplier : 1;
     const burstId = Date.now();
-    const sparksConfig = [
+
+    const sparksConfig = isFever ? [
+      { text: `🔥 +${multiplier} 온기 (피버!)`, vx: 0, vy: -135, scale: 1.35, rotate: 0 },
+      { text: '💥 피버!', vx: -42, vy: -140, scale: 1.2, rotate: -15 },
+      { text: `🔥 +${multiplier}`, vx: 42, vy: -135, scale: 1.25, rotate: 15 },
+      { text: '✨', vx: -72, vy: -95, scale: 1.0, rotate: -25 },
+      { text: '🔥', vx: 72, vy: -100, scale: 1.1, rotate: 25 },
+      { text: '🌟', vx: -22, vy: -155, scale: 1.3, rotate: -8 },
+      { text: '💛', vx: 22, vy: -150, scale: 1.2, rotate: 8 },
+      { text: `+${multiplier}`, vx: -52, vy: -110, scale: 1.1, rotate: -18 },
+      { text: `+${multiplier}`, vx: 52, vy: -115, scale: 1.1, rotate: 18 },
+    ] : [
       { text: '+1 온기 🕯️', vx: 0, vy: -125, scale: 1.15, rotate: 0 },
       { text: '✨', vx: -42, vy: -140, scale: 1.1, rotate: -15 },
       { text: '💛', vx: 42, vy: -135, scale: 1.1, rotate: 15 },
@@ -188,8 +207,9 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
       return;
     }
 
-    setCandleCount((prev) => prev + 1);
+    setCandleCount((prev) => prev + (warmthRes.effectiveAmount || 1));
     setCooldownStatus(getCooldownStatus(user?.id));
+    setBoosterStatus(getBoosterStatus(user?.id));
     setWarmthProgress(calculateWarmthProgress(warmthRes.lifetime, warmthRes.spendable));
 
     if (warmthRes.cooldownTriggered) {
@@ -338,6 +358,19 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           </div>
         )}
 
+        {/* 30초 3배 피버 모드 실시간 활성화 배너 */}
+        {boosterStatus.isActive && (
+          <div className="w-full max-w-xs mb-3 py-1.5 px-3 rounded-2xl bg-gradient-to-r from-red-950/90 via-orange-900/90 to-amber-950/90 border border-orange-500/80 shadow-[0_0_25px_rgba(249,115,22,0.6)] flex items-center justify-between animate-pulse">
+            <div className="flex items-center gap-1.5 text-xs font-black text-amber-200">
+              <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
+              <span>🔥 3배 온기 피버 모드!</span>
+            </div>
+            <span className="font-mono font-black text-xs text-orange-300 bg-black/50 px-2 py-0.5 rounded-full border border-orange-400/40">
+              {formatCooldown(boosterStatus.remainingSeconds)}
+            </span>
+          </div>
+        )}
+
         {/* 분수처럼 솟구쳐 퍼지는 온기 스파크 파티클들 */}
         {floatingSparks.map((spark) => (
           <div
@@ -359,17 +392,32 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         {/* 실감나는 멀티레이어 SVG 촛불 비주얼 */}
         <div
           onClick={handleLightCandle}
-          className="relative cursor-pointer group active:scale-95 transition-transform my-2"
-          title="탭하여 온기 촛불 밝히기 (맑은 벨소리가 울려요)"
+          className={`relative cursor-pointer group active:scale-95 transition-all my-2 ${
+            boosterStatus.isActive ? 'scale-105' : ''
+          }`}
+          title={boosterStatus.isActive ? '🔥 3배 온기 피버 탭! (+3 🕯️)' : '탭하여 온기 촛불 밝히기 (맑은 벨소리가 울려요)'}
         >
-          {/* 황금빛 주변광 글로우 */}
-          <div className="absolute -inset-6 bg-gradient-to-tr from-amber-500/40 via-orange-500/30 to-transparent rounded-full blur-2xl group-hover:blur-3xl transition-all animate-pulse" />
+          {/* 황금빛 / 피버 화염 주변광 글로우 */}
+          <div
+            className={`absolute -inset-6 rounded-full transition-all animate-pulse ${
+              boosterStatus.isActive
+                ? 'bg-gradient-to-tr from-red-600/60 via-orange-500/50 to-amber-400/40 blur-3xl'
+                : 'bg-gradient-to-tr from-amber-500/40 via-orange-500/30 to-transparent blur-2xl group-hover:blur-3xl'
+            }`}
+          />
 
           {/* 촛불 불꽃과 촛대 컨테이너 */}
           <div className="relative flex flex-col items-center">
             {/* 춤추는 불꽃 SVG */}
-            <div className="relative animate-bounce duration-1000">
-              <svg viewBox="0 0 64 90" className="w-14 h-20 filter drop-shadow-[0_0_18px_rgba(245,158,11,0.95)]">
+            <div className={`relative animate-bounce duration-1000 ${boosterStatus.isActive ? 'scale-110' : ''}`}>
+              <svg
+                viewBox="0 0 64 90"
+                className={`w-14 h-20 filter ${
+                  boosterStatus.isActive
+                    ? 'drop-shadow-[0_0_26px_rgba(239,68,68,0.95)]'
+                    : 'drop-shadow-[0_0_18px_rgba(245,158,11,0.95)]'
+                }`}
+              >
                 <defs>
                   <radialGradient id="flameGrad" cx="50%" cy="80%" r="50%">
                     <stop offset="0%" stopColor="#FFFFFF" />
@@ -408,16 +456,28 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         {/* 촛불 카피 */}
         <div className="mt-3 space-y-1">
           <h3 className="text-sm sm:text-base font-black text-slate-100">
-            이웃들에게 작은 온기를 밝혀주세요
+            {boosterStatus.isActive ? '🔥 3배 온기 피버 모드가 가동 중입니다!' : '이웃들에게 작은 온기를 밝혀주세요'}
           </h3>
           <p className="text-[11px] text-slate-400">
-            촛불을 터치하면 맑은 싱잉볼 소리와 함께 다른 친구들에게 온기가 전해집니다.
+            {boosterStatus.isActive
+              ? '촛불을 터치할 때마다 +3 온기가 차곡차곡 쌓입니다. 마음껏 터치하세요!'
+              : '촛불을 터치하면 맑은 싱잉볼 소리와 함께 다른 친구들에게 온기가 전해집니다.'}
           </p>
         </div>
 
-        {/* 온기 충전 게이지 & 쿨타임 인디케이터 */}
+        {/* 온기 충전 게이지 & 쿨타임 & 피버 인디케이터 */}
         <div className="w-full max-w-xs mt-3 px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/[0.06] flex items-center justify-between text-[11px]">
-          {cooldownStatus.inCooldown ? (
+          {boosterStatus.isActive ? (
+            <div className="flex items-center justify-between w-full text-orange-300 font-bold">
+              <div className="flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400 animate-bounce" />
+                <span>피버 모드 (터치당 +3 🕯️ 무제한)</span>
+              </div>
+              <span className="font-mono text-xs text-orange-200 font-black">
+                {formatCooldown(boosterStatus.remainingSeconds)}
+              </span>
+            </div>
+          ) : cooldownStatus.inCooldown ? (
             <div className="flex items-center gap-1.5 text-amber-300 font-mono w-full justify-center">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
               <span>촛불이 숨을 고르는 중...</span>
@@ -444,45 +504,55 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           )}
         </div>
 
-        {/* 인터랙티브 탭 버튼 & 5배 부스터 */}
+        {/* 인터랙티브 탭 버튼 & 3배 피버 부스터 */}
         <div className="flex flex-col sm:flex-row items-center gap-2 mt-2 w-full max-w-xs justify-center">
           <button
             onClick={handleLightCandle}
-            disabled={cooldownStatus.inCooldown}
+            disabled={!boosterStatus.isActive && cooldownStatus.inCooldown}
             className={`w-full sm:w-auto flex-1 py-2 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              cooldownStatus.inCooldown
+              boosterStatus.isActive
+                ? 'text-white bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 hover:from-red-500 hover:to-amber-400 active:scale-95 shadow-[0_0_25px_rgba(249,115,22,0.6)] animate-pulse font-black'
+                : cooldownStatus.inCooldown
                 ? 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
                 : 'text-amber-300 bg-amber-950/70 border border-amber-500/40 hover:bg-amber-900/70 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.25)]'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin duration-3000" />
-            <span>
-              {cooldownStatus.inCooldown
-                ? `휴식 중 (${formatCooldown(cooldownStatus.remainingSeconds)})`
-                : '온기 촛불 켜기 (+1)'}
-            </span>
+            {boosterStatus.isActive ? (
+              <>
+                <Flame className="w-4 h-4 fill-white text-white animate-bounce" />
+                <span>🔥 3배 피버 탭! (+3 🕯️)</span>
+              </>
+            ) : cooldownStatus.inCooldown ? (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-slate-600" />
+                <span>휴식 중 ({formatCooldown(cooldownStatus.remainingSeconds)})</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin duration-3000" />
+                <span>온기 촛불 켜기 (+1)</span>
+              </>
+            )}
           </button>
 
-          <button
-            onClick={() => {
-              if (cooldownStatus.inCooldown) {
-                setToastMessage(`⏳ 촛불이 휴식 중입니다. (${formatCooldown(cooldownStatus.remainingSeconds)} 후 충전)`);
-                setTimeout(() => setToastMessage(null), 3000);
-                return;
-              }
-              setIsRewardedAdOpen(true);
-            }}
-            disabled={cooldownStatus.inCooldown}
-            className={`w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              cooldownStatus.inCooldown
-                ? 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'
-                : 'text-pink-200 bg-pink-950/70 border border-pink-500/40 hover:bg-pink-900/70 active:scale-95 shadow-[0_0_20px_rgba(236,72,153,0.25)]'
-            }`}
-            title="15초 광고 시청 후 온기 5개 즉시 충전"
-          >
-            <Flame className="w-3.5 h-3.5 text-pink-400 fill-pink-400 animate-pulse" />
-            <span>5배 부스터 (+5 🕯️)</span>
-          </button>
+          {boosterStatus.isActive ? (
+            <div
+              className="w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold bg-orange-950/50 border border-orange-500/40 text-orange-300 flex items-center justify-center gap-1.5 select-none shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+              title="30초간 3배 온기 피버 모드가 가동 중입니다"
+            >
+              <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400 animate-spin" />
+              <span>피버 중 ({formatCooldown(boosterStatus.remainingSeconds)})</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsRewardedAdOpen(true)}
+              className="w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-pink-200 bg-pink-950/70 border border-pink-500/40 hover:bg-pink-900/70 active:scale-95 shadow-[0_0_20px_rgba(236,72,153,0.25)]"
+              title="15초 광고 시청 후 30초간 터치당 온기 3배 피버 모드 발동"
+            >
+              <Flame className="w-3.5 h-3.5 text-pink-400 fill-pink-400 animate-pulse" />
+              <span>3배 피버 부스터 🔥</span>
+            </button>
+          )}
         </div>
 
         {/* 내 온기 레벨 & 잔액 & 상점 진입 버튼 */}
@@ -828,35 +898,22 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         onClose={() => setIsRewardedAdOpen(false)}
         rewardType="candle"
         onRewardClaimed={() => {
-          const warmthRes = addWarmth(5, user?.id);
-          if (!warmthRes.success) {
-            setToastMessage(`⏳ 촛불이 숨을 고르는 중입니다. (${formatCooldown(warmthRes.remainingCooldownSeconds)} 후 재충전)`);
-            setTimeout(() => setToastMessage(null), 3000);
-            return;
-          }
-
-          setCandleCount((prev) => prev + 5);
+          const newBooster = activateBooster(30, 3, user?.id);
+          setBoosterStatus(newBooster);
           setCooldownStatus(getCooldownStatus(user?.id));
-          setWarmthProgress(calculateWarmthProgress(warmthRes.lifetime, warmthRes.spendable));
           soundscape.playCandleChime();
 
           const burstSparks = [
-            { id: Date.now() + 1, text: '🕯️ +5 온기', vx: 0, vy: -120, rotate: 0, scale: 1.4, delay: 0 },
-            { id: Date.now() + 2, text: '✨ 부스터', vx: -45, vy: -95, rotate: -15, scale: 1.1, delay: 50 },
-            { id: Date.now() + 3, text: '💛 온기', vx: 50, vy: -105, rotate: 15, scale: 1.2, delay: 90 },
+            { id: Date.now() + 1, text: '🔥 3배 피버 START!', vx: 0, vy: -130, rotate: 0, scale: 1.4, delay: 0 },
+            { id: Date.now() + 2, text: '⚡ 30초간 +3 🕯️', vx: -45, vy: -100, rotate: -15, scale: 1.2, delay: 50 },
+            { id: Date.now() + 3, text: '🔥 마음껏 터치하세요!', vx: 50, vy: -110, rotate: 15, scale: 1.2, delay: 90 },
           ];
           setFloatingSparks((prev) => [...prev, ...burstSparks]);
           setTimeout(() => {
             setFloatingSparks((prev) => prev.filter((s) => !burstSparks.some((b) => b.id === s.id)));
-          }, 1400);
+          }, 1600);
 
-          if (warmthRes.cooldownTriggered) {
-            setToastMessage(`🔥 10 온기를 가득 채웠습니다! 촛불이 5분간 숨을 고릅니다.`);
-          } else if (warmthRes.leveledUp) {
-            setToastMessage(`🎉 축하합니다! Lv.${warmthRes.newTier.level} [${warmthRes.newTier.title}]로 승급하셨습니다!`);
-          } else {
-            setToastMessage('온기 5배 부스터가 적용되었습니다! ✨ (+5 온기)');
-          }
+          setToastMessage('🔥 30초간 3배 온기 피버 모드가 시작되었습니다! 촛불을 마음껏 터치하세요!');
           setTimeout(() => setToastMessage(null), 3500);
         }}
       />

@@ -243,15 +243,82 @@ export function getUserScopedKey(baseKey: string, customUserId?: string | null):
 }
 
 // ==========================================
-// 쿨타임 시스템 (10 온기당 5분 쿨다운)
+// 쿨타임 & 부스터 시스템 (10 온기당 5분 쿨다운, 30초 3배 피버 부스터)
 // ==========================================
 const STORAGE_SPENDABLE = 'logmate_user_warmth';
 const STORAGE_LIFETIME = 'logmate_lifetime_warmth';
 const STORAGE_CYCLE_ENERGY = 'logmate_warmth_cycle_energy';
 const STORAGE_COOLDOWN_UNTIL = 'logmate_warmth_cooldown_until';
+const STORAGE_BOOSTER_UNTIL = 'logmate_warmth_booster_until';
+const STORAGE_BOOSTER_MULTIPLIER = 'logmate_warmth_booster_multiplier';
 
 export const MAX_CYCLE_ENERGY = 10;
 export const COOLDOWN_DURATION_MS = 5 * 60 * 1000; // 5분 (300초)
+export const DEFAULT_BOOSTER_DURATION_SECONDS = 30;
+export const DEFAULT_BOOSTER_MULTIPLIER = 3;
+
+export interface BoosterStatus {
+  isActive: boolean;
+  remainingSeconds: number;
+  multiplier: number;
+}
+
+export function getBoosterStatus(customUserId?: string | null): BoosterStatus {
+  if (typeof window === 'undefined') {
+    return { isActive: false, remainingSeconds: 0, multiplier: 1 };
+  }
+
+  const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
+  const boosterUntilKey = getUserScopedKey(STORAGE_BOOSTER_UNTIL, uid);
+  const multiplierKey = getUserScopedKey(STORAGE_BOOSTER_MULTIPLIER, uid);
+
+  const boosterUntil = parseInt(localStorage.getItem(boosterUntilKey) || '0', 10);
+  const multiplier = parseInt(localStorage.getItem(multiplierKey) || `${DEFAULT_BOOSTER_MULTIPLIER}`, 10);
+  const now = Date.now();
+
+  if (boosterUntil > now) {
+    const remainingSeconds = Math.ceil((boosterUntil - now) / 1000);
+    return {
+      isActive: true,
+      remainingSeconds,
+      multiplier: multiplier || DEFAULT_BOOSTER_MULTIPLIER,
+    };
+  }
+
+  return {
+    isActive: false,
+    remainingSeconds: 0,
+    multiplier: 1,
+  };
+}
+
+export function activateBooster(
+  durationSeconds: number = DEFAULT_BOOSTER_DURATION_SECONDS,
+  multiplier: number = DEFAULT_BOOSTER_MULTIPLIER,
+  customUserId?: string | null
+): BoosterStatus {
+  const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
+  const boosterUntilKey = getUserScopedKey(STORAGE_BOOSTER_UNTIL, uid);
+  const multiplierKey = getUserScopedKey(STORAGE_BOOSTER_MULTIPLIER, uid);
+  const cooldownUntilKey = getUserScopedKey(STORAGE_COOLDOWN_UNTIL, uid);
+  const energyKey = getUserScopedKey(STORAGE_CYCLE_ENERGY, uid);
+
+  const boosterUntil = Date.now() + durationSeconds * 1000;
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(boosterUntilKey, boosterUntil.toString());
+    localStorage.setItem(multiplierKey, multiplier.toString());
+    // 피버 모드 발동 시 기존 쿨타임 해제 및 에너지 초기화로 자유로운 터치 허용
+    localStorage.removeItem(cooldownUntilKey);
+    localStorage.setItem(energyKey, '0');
+  }
+
+  return {
+    isActive: true,
+    remainingSeconds: durationSeconds,
+    multiplier,
+  };
+}
 
 export interface CooldownStatus {
   inCooldown: boolean;
@@ -266,6 +333,18 @@ export function getCooldownStatus(customUserId?: string | null): CooldownStatus 
   }
 
   const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
+  const booster = getBoosterStatus(uid);
+
+  // 피버 부스터 가동 중에는 쿨타임 면제
+  if (booster.isActive) {
+    return {
+      inCooldown: false,
+      remainingSeconds: 0,
+      currentEnergy: MAX_CYCLE_ENERGY,
+      maxEnergy: MAX_CYCLE_ENERGY,
+    };
+  }
+
   const cooldownUntilKey = getUserScopedKey(STORAGE_COOLDOWN_UNTIL, uid);
   const energyKey = getUserScopedKey(STORAGE_CYCLE_ENERGY, uid);
 
@@ -328,16 +407,20 @@ export interface AddWarmthResult {
   remainingCooldownSeconds: number;
   currentEnergy: number;
   maxEnergy: number;
+  isBoosterActive: boolean;
+  multiplier: number;
+  effectiveAmount: number;
 }
 
-export function addWarmth(amount: number, customUserId?: string | null): AddWarmthResult {
+export function addWarmth(amount: number = 1, customUserId?: string | null): AddWarmthResult {
   const uid = customUserId !== undefined ? customUserId : getCurrentUserId();
   const current = getStoredWarmth(uid);
   const oldTier = calculateWarmthProgress(current.lifetime, current.spendable).tier;
+  const booster = getBoosterStatus(uid);
   const cooldownStatus = getCooldownStatus(uid);
 
-  // 쿨타임 중이면 온기 획득 불가
-  if (cooldownStatus.inCooldown) {
+  // 부스터가 없고 쿨타임 중이면 온기 획득 불가
+  if (!booster.isActive && cooldownStatus.inCooldown) {
     return {
       success: false,
       spendable: current.spendable,
@@ -348,37 +431,50 @@ export function addWarmth(amount: number, customUserId?: string | null): AddWarm
       remainingCooldownSeconds: cooldownStatus.remainingSeconds,
       currentEnergy: MAX_CYCLE_ENERGY,
       maxEnergy: MAX_CYCLE_ENERGY,
+      isBoosterActive: false,
+      multiplier: 1,
+      effectiveAmount: 0,
     };
   }
 
-  const newSpendable = current.spendable + amount;
-  const newLifetime = current.lifetime + amount;
-  const newEnergy = cooldownStatus.currentEnergy + amount;
+  // 부스터 적용 배율 (기본 3배)
+  const multiplier = booster.isActive ? booster.multiplier : 1;
+  const effectiveAmount = amount * multiplier;
+
+  const newSpendable = current.spendable + effectiveAmount;
+  const newLifetime = current.lifetime + effectiveAmount;
 
   let cooldownTriggered = false;
   let remainingCooldownSeconds = 0;
-  let finalEnergy = newEnergy;
+  let finalEnergy = cooldownStatus.currentEnergy;
 
   const cooldownUntilKey = getUserScopedKey(STORAGE_COOLDOWN_UNTIL, uid);
   const energyKey = getUserScopedKey(STORAGE_CYCLE_ENERGY, uid);
   const spendableKey = getUserScopedKey(STORAGE_SPENDABLE, uid);
   const lifetimeKey = getUserScopedKey(STORAGE_LIFETIME, uid);
 
-  if (newEnergy >= MAX_CYCLE_ENERGY) {
-    // 10 온기 달성 시 5분 쿨타임 발동!
-    cooldownTriggered = true;
-    const cooldownUntil = Date.now() + COOLDOWN_DURATION_MS;
-    remainingCooldownSeconds = 300;
-    finalEnergy = MAX_CYCLE_ENERGY;
+  // 부스터 가동 중에는 쿨타임 카운터를 올리지 않고 피버 모드 유지!
+  if (!booster.isActive) {
+    const newEnergy = cooldownStatus.currentEnergy + amount;
+    if (newEnergy >= MAX_CYCLE_ENERGY) {
+      // 10 온기 달성 시 5분 쿨타임 발동!
+      cooldownTriggered = true;
+      const cooldownUntil = Date.now() + COOLDOWN_DURATION_MS;
+      remainingCooldownSeconds = 300;
+      finalEnergy = MAX_CYCLE_ENERGY;
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(cooldownUntilKey, cooldownUntil.toString());
-      localStorage.setItem(energyKey, '0');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(cooldownUntilKey, cooldownUntil.toString());
+        localStorage.setItem(energyKey, '0');
+      }
+    } else {
+      finalEnergy = newEnergy;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(energyKey, newEnergy.toString());
+      }
     }
   } else {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(energyKey, newEnergy.toString());
-    }
+    finalEnergy = MAX_CYCLE_ENERGY;
   }
 
   if (typeof window !== 'undefined') {
@@ -399,6 +495,9 @@ export function addWarmth(amount: number, customUserId?: string | null): AddWarm
     remainingCooldownSeconds,
     currentEnergy: finalEnergy,
     maxEnergy: MAX_CYCLE_ENERGY,
+    isBoosterActive: booster.isActive,
+    multiplier,
+    effectiveAmount,
   };
 }
 
