@@ -1,6 +1,6 @@
 // 온기 레벨 & 프로필 아바타 진화 시스템 (총 100단계 대확장)
 // 10대 계급(Major Tiers) x 10개 세부 레벨 = 총 100레벨
-// 쿨타임 시스템: 10 온기 획득 시 5분(300초) 쿨타임 발동
+// 쿨타임 시스템: 10 온기 획득 시 15분(900초) 쿨타임 발동
 // 유저별 격리(User-Scoped): 계정 변경 및 로그아웃 시 레벨/온기/패스 완벽 분리
 
 export interface WarmthTier {
@@ -254,7 +254,7 @@ export function getUserScopedKey(baseKey: string, customUserId?: string | null):
 }
 
 // ==========================================
-// 쿨타임 & 부스터 시스템 (10 온기당 5분 쿨다운, 30초 3배 피버 부스터)
+// 쿨타임 & 부스터 시스템 (10 온기당 15분 쿨다운, 30초 2배 피버 부스터)
 // ==========================================
 const STORAGE_SPENDABLE = 'logmate_user_warmth';
 const STORAGE_LIFETIME = 'logmate_lifetime_warmth';
@@ -264,9 +264,9 @@ const STORAGE_BOOSTER_UNTIL = 'logmate_warmth_booster_until';
 const STORAGE_BOOSTER_MULTIPLIER = 'logmate_warmth_booster_multiplier';
 
 export const MAX_CYCLE_ENERGY = 10;
-export const COOLDOWN_DURATION_MS = 5 * 60 * 1000; // 5분 (300초)
+export const COOLDOWN_DURATION_MS = 15 * 60 * 1000; // 15분 (900초)
 export const DEFAULT_BOOSTER_DURATION_SECONDS = 30;
-export const DEFAULT_BOOSTER_MULTIPLIER = 3;
+export const DEFAULT_BOOSTER_MULTIPLIER = 2;
 
 export interface BoosterStatus {
   isActive: boolean;
@@ -436,7 +436,7 @@ export function addWarmth(amount: number = 1, customUserId?: string | null): Add
     };
   }
 
-  // 부스터 적용 배율 (기본 3배)
+  // 부스터 적용 배율 (기본 2배)
   const multiplier = booster.isActive ? booster.multiplier : 1;
   const effectiveAmount = amount * multiplier;
 
@@ -456,10 +456,10 @@ export function addWarmth(amount: number = 1, customUserId?: string | null): Add
   if (!booster.isActive) {
     const newEnergy = cooldownStatus.currentEnergy + amount;
     if (newEnergy >= MAX_CYCLE_ENERGY) {
-      // 10 온기 달성 시 5분 쿨타임 발동!
+      // 10 온기 달성 시 15분 쿨타임 발동!
       cooldownTriggered = true;
       const cooldownUntil = Date.now() + COOLDOWN_DURATION_MS;
-      remainingCooldownSeconds = 300;
+      remainingCooldownSeconds = Math.ceil(COOLDOWN_DURATION_MS / 1000);
       finalEnergy = MAX_CYCLE_ENERGY;
 
       if (typeof window !== 'undefined') {

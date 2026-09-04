@@ -249,7 +249,7 @@ export function WarmthLevelModal({
         <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-2">
           <div className="text-[10px] text-slate-400 flex items-center gap-1">
             <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-            <span>촛불 켜기(+1) & 15초 부스터(+5)</span>
+            <span>촛불 켜기(+1) & 30초 부스터(+2)</span>
           </div>
 
           {onOpenBooster && (
@@ -260,7 +260,7 @@ export function WarmthLevelModal({
               }}
               className="py-1.5 px-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-600 hover:to-pink-600 active:scale-95 transition-all shadow-md shadow-pink-500/20 flex items-center gap-1"
             >
-              <span>5배 부스터로 레벨업</span>
+              <span>2배 부스터로 레벨업</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           )}

@@ -198,6 +198,13 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
 
   // 촛불 켜기 액션 (하이엔드 리플 + 연타 콤보 멜로디 + 즉각적 체온 상승 + 행운의 위로 카드)
   const handleLightCandle = async () => {
+    // 0. 쿨타임 상태 검사: 부스터 미적용 상태에서 숨고르는 중이면 모든 진동/소리/콤보 차단
+    if (!boosterStatus.isActive && cooldownStatus.inCooldown) {
+      setToastMessage(`⏳ 촛불이 숨을 고르는 중입니다. (${formatCooldown(cooldownStatus.remainingSeconds)} 후 다시 밝힐 수 있어요)`);
+      setTimeout(() => setToastMessage(null), 2500);
+      return;
+    }
+
     // 1. 햅틱 진동
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(35);
@@ -335,7 +342,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
     setRecentEvents((prev) => [myNewEvent, ...prev.slice(0, 19)]);
 
     if (warmthRes.cooldownTriggered) {
-      setToastMessage(`🔥 10 온기를 가득 채웠습니다! 촛불이 5분간 숨을 고릅니다.`);
+      setToastMessage(`🔥 10 온기를 가득 채웠습니다! 촛불이 15분간 숨을 고릅니다.`);
       setTimeout(() => setToastMessage(null), 3500);
     } else if (warmthRes.leveledUp) {
       setToastMessage(`🎉 축하합니다! Lv.${warmthRes.newTier.level} [${warmthRes.newTier.title}]로 승급하셨습니다! 아바타 ${warmthRes.newTier.avatarEmoji} 해금!`);
@@ -463,9 +470,48 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
   // 오늘 밤 커뮤니티 온기 마일스톤 목표 (기본 2,000 온기)
   const milestoneGoal = 2000;
   const milestonePercent = Math.min(100, Math.round((candleCount / milestoneGoal) * 100));
+  const isGoalAchieved = candleCount >= milestoneGoal;
 
   return (
-    <div className="w-full h-full flex-1 overflow-y-auto space-y-4 px-1 pb-28 pt-1 text-slate-100 select-none no-scrollbar">
+    <div className="relative w-full h-full flex-1 overflow-y-auto space-y-4 px-1 pb-28 pt-1 text-slate-100 select-none no-scrollbar">
+      {/* 0. 오늘 밤하늘 목표(2000 온기) 100% 달성 시 밤하늘 전체에 개화하는 은하수 오로라 & 별빛 배경 */}
+      {isGoalAchieved && (
+        <div className="absolute inset-0 pointer-events-none -z-10 overflow-hidden rounded-3xl">
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-[550px] h-80 bg-gradient-to-b from-purple-600/30 via-indigo-600/20 to-transparent rounded-full blur-3xl animate-pulse duration-3000" />
+          <div className="absolute top-1/4 -left-12 w-60 h-60 bg-teal-500/15 rounded-full blur-3xl" />
+          <div className="absolute top-1/3 -right-12 w-60 h-60 bg-pink-500/15 rounded-full blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(#e0e7ff_1px,transparent_1px)] [background-size:22px_22px] opacity-20" />
+        </div>
+      )}
+
+      {/* 0-1. 은하수 목표 100% 개화 축하 스페셜 엠블럼 배너 */}
+      {isGoalAchieved && (
+        <div className="w-full p-4 rounded-3xl bg-gradient-to-r from-purple-950/90 via-slate-900/95 to-indigo-950/90 border border-purple-400/60 shadow-[0_0_35px_rgba(168,85,247,0.35)] relative overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-amber-500/10 animate-pulse" />
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500 via-indigo-500 to-amber-400 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(216,180,254,0.6)] flex-shrink-0 animate-bounce">
+              🌌
+            </div>
+            <div className="space-y-0.5 text-left flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/30 border border-purple-400/50 text-[10px] font-black text-purple-200">
+                  ✨ 오늘 밤하늘 목표 100% 달성 완료!
+                </span>
+                <span className="text-[10px] text-amber-300 font-bold">
+                  은하수 개화 축복 발동 중
+                </span>
+              </div>
+              <h4 className="text-xs sm:text-sm font-black text-slate-100 truncate">
+                이웃들의 온기가 모여 밤하늘이 환하게 밝아졌습니다
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-300 leading-tight">
+                오늘 밤 라운지 방문자 전원에게 <strong>은하수 오로라 밤하늘 테마</strong>와 <strong>별빛 축복</strong>이 적용됩니다 🌟
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. 상단 실제 접속자 라이브 배너 */}
       <div className="glass-card rounded-2xl p-3.5 sm:p-4 border border-indigo-500/20 shadow-[0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-between">
         <div className="space-y-0.5">
@@ -493,7 +539,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           </span>
           <div className="flex-1 truncate text-slate-300 animate-in fade-in duration-300">
             {recentEvents[0].type === 'fever' ? (
-              <span>🔥 <strong className="text-orange-300 font-semibold">{recentEvents[0].nickname}</strong>님이 3배 피버 탭으로 밤하늘을 밝혔습니다! (+{recentEvents[0].amount} 🕯️)</span>
+              <span>🔥 <strong className="text-orange-300 font-semibold">{recentEvents[0].nickname}</strong>님이 2배 피버 탭으로 밤하늘을 밝혔습니다! (+{recentEvents[0].amount} 🕯️)</span>
             ) : recentEvents[0].type === 'whisper' ? (
               <span>🌙 <strong className="text-pink-300 font-semibold">{recentEvents[0].nickname}</strong>님이 밤하늘에 한 줄 소망을 띄웠습니다</span>
             ) : recentEvents[0].type === 'bonus' ? (
@@ -506,22 +552,43 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
       )}
 
       {/* 1-3. 오늘 밤 커뮤니티 온기 마일스톤 게이지 바 */}
-      <div className="glass-card rounded-2xl p-3.5 border border-amber-500/20 bg-gradient-to-r from-amber-950/30 via-slate-900 to-indigo-950/30 space-y-2">
+      <div className={`glass-card rounded-2xl p-3.5 border transition-all duration-500 space-y-2 ${
+        isGoalAchieved
+          ? 'border-purple-500/50 bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 shadow-[0_0_25px_rgba(168,85,247,0.25)]'
+          : 'border-amber-500/20 bg-gradient-to-r from-amber-950/30 via-slate-900 to-indigo-950/30'
+      }`}>
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5">
-            <Target className="w-4 h-4 text-amber-400" />
-            <span className="font-bold text-slate-200">오늘 밤하늘 목표: 2,000 온기</span>
+            {isGoalAchieved ? (
+              <>
+                <Sparkles className="w-4 h-4 text-purple-300 animate-spin" />
+                <span className="font-bold text-purple-200">오늘 밤하늘 은하수 목표 100% 달성! 🌌</span>
+              </>
+            ) : (
+              <>
+                <Target className="w-4 h-4 text-amber-400" />
+                <span className="font-bold text-slate-200">오늘 밤하늘 목표: 2,000 온기</span>
+              </>
+            )}
           </div>
-          <div className="flex items-center gap-1 font-mono font-bold text-amber-300 text-xs">
-            <span>{candleCount.toLocaleString()}</span>
-            <span className="text-slate-500 font-normal">/ 2,000 ({milestonePercent}%)</span>
+          <div className="flex items-center gap-1 font-mono font-bold text-xs">
+            <span className={isGoalAchieved ? 'text-purple-300 font-black' : 'text-amber-300'}>
+              {candleCount.toLocaleString()}
+            </span>
+            <span className={isGoalAchieved ? 'text-purple-400 font-semibold' : 'text-slate-500 font-normal'}>
+              / 2,000 ({milestonePercent}% {isGoalAchieved ? '완료' : ''})
+            </span>
           </div>
         </div>
 
         {/* 게이지 바 */}
         <div className="relative w-full h-2.5 bg-slate-950/80 rounded-full overflow-hidden border border-white/10">
           <div
-            className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 rounded-full transition-all duration-700 relative shadow-[0_0_12px_rgba(245,158,11,0.6)]"
+            className={`h-full rounded-full transition-all duration-700 relative ${
+              isGoalAchieved
+                ? 'bg-gradient-to-r from-teal-400 via-purple-400 to-amber-300 shadow-[0_0_16px_rgba(168,85,247,0.8)]'
+                : 'bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 shadow-[0_0_12px_rgba(245,158,11,0.6)]'
+            }`}
             style={{ width: `${milestonePercent}%` }}
           >
             <div className="absolute inset-0 bg-white/25 animate-pulse" />
@@ -548,11 +615,11 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           </div>
           <div className={`p-1.5 rounded-lg border text-center transition-all ${
             candleCount >= 2000
-              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+              ? 'bg-purple-950/80 border-purple-400/70 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.5)] font-bold'
               : 'bg-amber-500/10 border-amber-500/30 text-amber-300 animate-pulse'
           }`}>
             <span className="block font-bold">2,000 온기</span>
-            <span className="text-[9px]">🌟 은하수 {candleCount >= 2000 ? '개화 완료!' : '보너스+50'}</span>
+            <span className="text-[9px]">🌟 은하수 {candleCount >= 2000 ? '개화 완료! ✓' : '보너스+50'}</span>
           </div>
         </div>
       </div>
@@ -593,11 +660,11 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           </div>
         )}
 
-        {/* 행운의 위로 포춘 카드 (12% 확률로 촛불 터치 시 등장) */}
+        {/* 행운의 위로 포춘 카드: 레이아웃 시프트(클릭 위치 흔들림) 방지를 위해 상단 플로팅 절대 위치(absolute)로 렌더링 */}
         {luckyWhisper && (
-          <div className="w-full max-w-xs mb-3 p-3 rounded-2xl bg-gradient-to-br from-amber-950/90 via-slate-900/95 to-indigo-950/90 border border-amber-400/60 shadow-[0_0_25px_rgba(245,158,11,0.5)] text-center animate-in fade-in zoom-in-95 duration-300">
-            <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-amber-300 mb-1">
-              <Sparkles className="w-3 h-3 text-amber-400 animate-spin" />
+          <div className="absolute top-3 left-4 right-4 z-40 p-2.5 rounded-2xl bg-gradient-to-br from-amber-950/95 via-slate-900/95 to-indigo-950/95 border border-amber-400/70 shadow-[0_4px_30px_rgba(245,158,11,0.6)] backdrop-blur-md text-center animate-in fade-in slide-in-from-top-2 duration-300 pointer-events-none">
+            <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-amber-300 mb-0.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
               <span>오늘 밤 당신에게 닿은 행운의 위로</span>
             </div>
             <p className="text-xs text-amber-100 font-medium leading-relaxed">
@@ -606,18 +673,26 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           </div>
         )}
 
-        {/* 30초 3배 피버 모드 실시간 활성화 배너 */}
-        {boosterStatus.isActive && (
-          <div className="w-full max-w-xs mb-3 py-1.5 px-3 rounded-2xl bg-gradient-to-r from-red-950/90 via-orange-900/90 to-amber-950/90 border border-orange-500/80 shadow-[0_0_25px_rgba(249,115,22,0.6)] flex items-center justify-between animate-pulse">
-            <div className="flex items-center gap-1.5 text-xs font-black text-amber-200">
-              <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
-              <span>🔥 3배 온기 피버 모드!</span>
+        {/* 상단 콤보 & 피버 상태 고정 영역 (레이아웃 시프트 방지) */}
+        <div className="h-8 flex items-center justify-center mb-1 w-full max-w-xs">
+          {boosterStatus.isActive ? (
+            <div className="w-full py-1 px-3 rounded-full bg-gradient-to-r from-red-950/90 via-orange-900/90 to-amber-950/90 border border-orange-500/80 shadow-[0_0_20px_rgba(249,115,22,0.5)] flex items-center justify-between animate-pulse">
+              <div className="flex items-center gap-1.5 text-xs font-black text-amber-200">
+                <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400 animate-bounce" />
+                <span>🔥 2배 온기 피버 모드!</span>
+              </div>
+              <span className="font-mono font-black text-[11px] text-orange-300 bg-black/50 px-2 py-0.5 rounded-full border border-orange-400/40">
+                {formatCooldown(boosterStatus.remainingSeconds)}
+              </span>
             </div>
-            <span className="font-mono font-black text-xs text-orange-300 bg-black/50 px-2 py-0.5 rounded-full border border-orange-400/40">
-              {formatCooldown(boosterStatus.remainingSeconds)}
-            </span>
-          </div>
-        )}
+          ) : comboCount >= 2 ? (
+            <div className="px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-black text-xs shadow-[0_0_18px_rgba(245,158,11,0.8)] animate-bounce flex items-center gap-1.5 select-none">
+              <Flame className="w-3.5 h-3.5 fill-white" />
+              <span>{comboCount} COMBO!</span>
+              {comboMessage && <span className="text-[10px] font-medium opacity-90 hidden sm:inline">| {comboMessage}</span>}
+            </div>
+          ) : null}
+        </div>
 
         {/* 분수처럼 솟구쳐 퍼지는 온기 스파크 파티클들 */}
         {floatingSparks.map((spark) => (
@@ -637,41 +712,65 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           </div>
         ))}
 
-        {/* 실감나는 멀티레이어 SVG 촛불 비주얼 */}
+        {/* 실감나는 멀티레이어 SVG 촛불 비주얼 (쿨타임 시 클릭 불가 및 휴식 모드 전환) */}
         <div
-          onClick={handleLightCandle}
-          className={`relative cursor-pointer group active:scale-95 transition-all my-2 ${
-            boosterStatus.isActive ? 'scale-105' : ''
+          onClick={!boosterStatus.isActive && cooldownStatus.inCooldown ? undefined : handleLightCandle}
+          className={`relative transition-all my-2 select-none ${
+            boosterStatus.isActive
+              ? 'cursor-pointer group active:scale-95 scale-105'
+              : cooldownStatus.inCooldown
+              ? 'cursor-not-allowed opacity-75'
+              : 'cursor-pointer group active:scale-95'
           }`}
-          title={boosterStatus.isActive ? '🔥 3배 온기 피버 탭! (+3 🕯️)' : '탭하여 온기 촛불 밝히기 (연타 시 맑은 멜로디가 울려요)'}
+          title={
+            boosterStatus.isActive
+              ? '🔥 2배 온기 피버 탭! (+2 🕯️)'
+              : cooldownStatus.inCooldown
+              ? `⏳ 촛불이 숨을 고르는 중입니다 (${formatCooldown(cooldownStatus.remainingSeconds)} 후 재충전)`
+              : '탭하여 온기 촛불 밝히기 (연타 시 맑은 멜로디가 울려요)'
+          }
         >
-          {/* 황금빛 / 피버 화염 주변광 글로우 */}
+          {/* 황금빛 / 피버 화염 주변광 글로우 / 은하수 개화 오라 */}
           <div
-            className={`absolute -inset-6 rounded-full transition-all animate-pulse ${
+            className={`absolute -inset-6 rounded-full transition-all ${
               boosterStatus.isActive
-                ? 'bg-gradient-to-tr from-red-600/60 via-orange-500/50 to-amber-400/40 blur-3xl'
-                : 'bg-gradient-to-tr from-amber-500/40 via-orange-500/30 to-transparent blur-2xl group-hover:blur-3xl'
+                ? 'bg-gradient-to-tr from-red-600/60 via-orange-500/50 to-amber-400/40 blur-3xl animate-pulse'
+                : cooldownStatus.inCooldown
+                ? 'bg-indigo-950/40 blur-xl opacity-40'
+                : isGoalAchieved
+                ? 'bg-gradient-to-tr from-purple-500/40 via-amber-400/40 to-teal-400/30 blur-2xl animate-pulse'
+                : 'bg-gradient-to-tr from-amber-500/40 via-orange-500/30 to-transparent blur-2xl group-hover:blur-3xl animate-pulse'
             }`}
           />
 
           {/* 촛불 불꽃과 촛대 컨테이너 */}
           <div className="relative flex flex-col items-center">
-            {/* 춤추는 불꽃 SVG */}
-            <div className={`relative animate-bounce duration-1000 ${boosterStatus.isActive ? 'scale-110' : ''}`}>
+            {/* 춤추는 불꽃 SVG / 쿨타임 시 조용한 쉼의 불꽃 */}
+            <div className={`relative duration-1000 ${
+              boosterStatus.isActive
+                ? 'animate-bounce scale-110'
+                : cooldownStatus.inCooldown
+                ? 'scale-90 opacity-60'
+                : 'animate-bounce'
+            }`}>
               <svg
                 viewBox="0 0 64 90"
                 className={`w-14 h-20 filter ${
                   boosterStatus.isActive
                     ? 'drop-shadow-[0_0_26px_rgba(239,68,68,0.95)]'
+                    : cooldownStatus.inCooldown
+                    ? 'drop-shadow-[0_0_8px_rgba(148,163,184,0.5)]'
+                    : isGoalAchieved
+                    ? 'drop-shadow-[0_0_24px_rgba(168,85,247,0.9)]'
                     : 'drop-shadow-[0_0_18px_rgba(245,158,11,0.95)]'
                 }`}
               >
                 <defs>
                   <radialGradient id="flameGrad" cx="50%" cy="80%" r="50%">
                     <stop offset="0%" stopColor="#FFFFFF" />
-                    <stop offset="30%" stopColor="#FEF08A" />
-                    <stop offset="65%" stopColor="#F97316" />
-                    <stop offset="100%" stopColor="#DC2626" />
+                    <stop offset="30%" stopColor={cooldownStatus.inCooldown && !boosterStatus.isActive ? '#94A3B8' : '#FEF08A'} />
+                    <stop offset="65%" stopColor={cooldownStatus.inCooldown && !boosterStatus.isActive ? '#64748B' : '#F97316'} />
+                    <stop offset="100%" stopColor={cooldownStatus.inCooldown && !boosterStatus.isActive ? '#475569' : '#DC2626'} />
                   </radialGradient>
                   <radialGradient id="blueCore" cx="50%" cy="90%" r="35%">
                     <stop offset="0%" stopColor="#BFDBFE" stopOpacity="0.9" />
@@ -698,17 +797,31 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
               <div className="w-full h-2 bg-amber-50/90 rounded-full blur-[0.5px]" />
               <div className="absolute top-1 left-2 w-1.5 h-6 bg-amber-100/70 rounded-full blur-[0.5px]" />
             </div>
+
+            {/* 쿨타임 중 숨고르기 미니 배지 */}
+            {cooldownStatus.inCooldown && !boosterStatus.isActive && (
+              <div className="absolute -bottom-2.5 px-2 py-0.5 rounded-full bg-slate-900/95 border border-amber-500/40 text-[9px] font-bold text-amber-300 shadow-md flex items-center gap-1 z-20 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>숨고르는 중 ({formatCooldown(cooldownStatus.remainingSeconds)})</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* 촛불 카피 */}
         <div className="mt-3 space-y-1">
           <h3 className="text-sm sm:text-base font-black text-slate-100">
-            {boosterStatus.isActive ? '🔥 3배 온기 피버 모드가 가동 중입니다!' : '이웃들에게 작은 온기를 밝혀주세요'}
+            {boosterStatus.isActive
+              ? '🔥 2배 온기 피버 모드가 가동 중입니다!'
+              : cooldownStatus.inCooldown
+              ? '🕯️ 촛불이 편안하게 숨을 고르는 중입니다'
+              : '이웃들에게 작은 온기를 밝혀주세요'}
           </h3>
           <p className="text-[11px] text-slate-400">
             {boosterStatus.isActive
-              ? '촛불을 터치할 때마다 +3 온기가 차곡차곡 쌓입니다. 마음껏 터치하세요!'
+              ? '촛불을 터치할 때마다 +2 온기가 차곡차곡 쌓입니다. 마음껏 터치하세요!'
+              : cooldownStatus.inCooldown
+              ? '10 온기를 충전하여 15분간 휴식 중입니다. 2배 부스터 시청 시 즉시 피버 모드로 깨어납니다.'
               : '촛불을 터치할 때마다 맑은 멜로디와 함께 실시간 온기 지수가 따뜻하게 데워집니다.'}
           </p>
         </div>
@@ -719,7 +832,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
             <div className="flex items-center justify-between w-full text-orange-300 font-bold">
               <div className="flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400 animate-bounce" />
-                <span>피버 모드 (터치당 +3 🕯️ 무제한)</span>
+                <span>피버 모드 (터치당 +2 🕯️ 무제한)</span>
               </div>
               <span className="font-mono text-xs text-orange-200 font-black">
                 {formatCooldown(boosterStatus.remainingSeconds)}
@@ -752,7 +865,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           )}
         </div>
 
-        {/* 인터랙티브 탭 버튼 & 3배 피버 부스터 */}
+        {/* 인터랙티브 탭 버튼 & 2배 피버 부스터 */}
         <div className="flex flex-col sm:flex-row items-center gap-2 mt-2 w-full max-w-xs justify-center">
           <button
             onClick={handleLightCandle}
@@ -768,7 +881,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
             {boosterStatus.isActive ? (
               <>
                 <Flame className="w-4 h-4 fill-white text-white animate-bounce" />
-                <span>🔥 3배 피버 탭! (+3 🕯️)</span>
+                <span>🔥 2배 피버 탭! (+2 🕯️)</span>
               </>
             ) : cooldownStatus.inCooldown ? (
               <>
@@ -786,7 +899,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           {boosterStatus.isActive ? (
             <div
               className="w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold bg-orange-950/50 border border-orange-500/40 text-orange-300 flex items-center justify-center gap-1.5 select-none shadow-[0_0_15px_rgba(249,115,22,0.3)]"
-              title="30초간 3배 온기 피버 모드가 가동 중입니다"
+              title="30초간 2배 온기 피버 모드가 가동 중입니다"
             >
               <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400 animate-spin" />
               <span>피버 중 ({formatCooldown(boosterStatus.remainingSeconds)})</span>
@@ -795,10 +908,10 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
             <button
               onClick={() => setIsRewardedAdOpen(true)}
               className="w-full sm:w-auto py-2 px-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-pink-200 bg-pink-950/70 border border-pink-500/40 hover:bg-pink-900/70 active:scale-95 shadow-[0_0_20px_rgba(236,72,153,0.25)]"
-              title="15초 광고 시청 후 30초간 터치당 온기 3배 피버 모드 발동"
+              title="15초 광고 시청 후 30초간 터치당 온기 2배 피버 모드 발동"
             >
               <Flame className="w-3.5 h-3.5 text-pink-400 fill-pink-400 animate-pulse" />
-              <span>3배 피버 부스터 🔥</span>
+              <span>2배 피버 부스터 🔥</span>
             </button>
           )}
         </div>
@@ -1162,14 +1275,14 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
         onClose={() => setIsRewardedAdOpen(false)}
         rewardType="candle"
         onRewardClaimed={() => {
-          const newBooster = activateBooster(30, 3, user?.id);
+          const newBooster = activateBooster(30, 2, user?.id);
           setBoosterStatus(newBooster);
           setCooldownStatus(getCooldownStatus(user?.id));
           soundscape.playCandleChime();
 
           const burstSparks = [
-            { id: Date.now() + 1, text: '🔥 3배 피버 START!', vx: 0, vy: -130, rotate: 0, scale: 1.4, delay: 0 },
-            { id: Date.now() + 2, text: '⚡ 30초간 +3 🕯️', vx: -45, vy: -100, rotate: -15, scale: 1.2, delay: 50 },
+            { id: Date.now() + 1, text: '🔥 2배 피버 START!', vx: 0, vy: -130, rotate: 0, scale: 1.4, delay: 0 },
+            { id: Date.now() + 2, text: '⚡ 30초간 +2 🕯️', vx: -45, vy: -100, rotate: -15, scale: 1.2, delay: 50 },
             { id: Date.now() + 3, text: '🔥 마음껏 터치하세요!', vx: 50, vy: -110, rotate: 15, scale: 1.2, delay: 90 },
           ];
           setFloatingSparks((prev) => [...prev, ...burstSparks]);
@@ -1177,7 +1290,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
             setFloatingSparks((prev) => prev.filter((s) => !burstSparks.some((b) => b.id === s.id)));
           }, 1600);
 
-          setToastMessage('🔥 30초간 3배 온기 피버 모드가 시작되었습니다! 촛불을 마음껏 터치하세요!');
+          setToastMessage('🔥 30초간 2배 온기 피버 모드가 시작되었습니다! 촛불을 마음껏 터치하세요!');
           setTimeout(() => setToastMessage(null), 3500);
         }}
       />
