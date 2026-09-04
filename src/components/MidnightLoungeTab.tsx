@@ -18,7 +18,8 @@ import {
   activateBooster,
   BoosterStatus,
   saveStoredPass,
-  WarmthProgress 
+  WarmthProgress,
+  WARMTH_SHOP_PRICES 
 } from '@/lib/warmthSystem';
 import { WarmthAvatar } from './WarmthAvatar';
 import { WarmthLevelModal } from './WarmthLevelModal';
@@ -924,7 +925,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         onClose={() => setIsWarmthShopOpen(false)}
         userWarmth={warmthProgress.spendableWarmth}
         onRedeemPass={() => {
-          const res = spendWarmth(25, user?.id);
+          const res = spendWarmth(WARMTH_SHOP_PRICES.PASS_1DAY, user?.id);
           if (!res.success) return;
           const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
@@ -938,7 +939,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           setIsWarmthShopOpen(false);
         }}
         onRedeemTarot={() => {
-          const res = spendWarmth(5, user?.id);
+          const res = spendWarmth(WARMTH_SHOP_PRICES.TAROT_DRAW, user?.id);
           if (!res.success) return;
           const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
@@ -946,7 +947,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           setIsTarotModalOpen(true);
         }}
         onRedeemSimilar={() => {
-          const res = spendWarmth(6, user?.id);
+          const res = spendWarmth(WARMTH_SHOP_PRICES.SIMILAR_UNLOCK, user?.id);
           if (!res.success) return;
           const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
@@ -955,7 +956,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           setIsWarmthShopOpen(false);
         }}
         onRedeemNotePack={() => {
-          const res = spendWarmth(10, user?.id);
+          const res = spendWarmth(WARMTH_SHOP_PRICES.NOTE_PACK_3, user?.id);
           if (!res.success) return;
           const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
@@ -969,7 +970,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           setIsWarmthShopOpen(false);
         }}
         onRedeemGoldenCandle={() => {
-          const res = spendWarmth(12, user?.id);
+          const res = spendWarmth(WARMTH_SHOP_PRICES.GOLDEN_CANDLE, user?.id);
           if (!res.success) return;
           const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
@@ -978,7 +979,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
           setIsWarmthShopOpen(false);
         }}
         onRedeemHiddenSound={() => {
-          const res = spendWarmth(20, user?.id);
+          const res = spendWarmth(WARMTH_SHOP_PRICES.HIDDEN_SOUND, user?.id);
           if (!res.success) return;
           const updated = getStoredWarmth(user?.id);
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
@@ -995,7 +996,7 @@ export function MidnightLoungeTab({ user, deviceId }: MidnightLoungeTabProps) {
         onClose={() => setIsTarotModalOpen(false)}
         userWarmth={warmthProgress.spendableWarmth}
         onDrawAgain={() => {
-          const res = spendWarmth(5, user?.id);
+          const res = spendWarmth(WARMTH_SHOP_PRICES.TAROT_DRAW, user?.id);
           if (res.success) {
             const updated = getStoredWarmth(user?.id);
             setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Sparkles, Ticket, LockOpen, Flame, Headphones, Mail, ScrollText, X } from 'lucide-react';
+import { WARMTH_SHOP_PRICES } from '@/lib/warmthSystem';
 
 interface WarmthShopModalProps {
   isOpen: boolean;
@@ -63,7 +64,7 @@ export function WarmthShopModal({
 
         {/* 교환 가능한 보상 리스트 */}
         <div className="space-y-2.5 pt-1">
-          {/* 1. 광고 없는 1일 이용권 (25 온기) */}
+          {/* 1. 광고 없는 1일 이용권 */}
           <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08] hover:border-amber-500/40 transition-all flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
@@ -80,18 +81,18 @@ export function WarmthShopModal({
 
             <button
               onClick={onRedeemPass}
-              disabled={userWarmth < 25}
+              disabled={userWarmth < WARMTH_SHOP_PRICES.PASS_1DAY}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
-                userWarmth >= 25
-                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 active:scale-95'
+                userWarmth >= WARMTH_SHOP_PRICES.PASS_1DAY
+                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 active:scale-95 font-black'
                   : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
               }`}
             >
-              25 온기
+              {WARMTH_SHOP_PRICES.PASS_1DAY} 온기
             </button>
           </div>
 
-          {/* 2. AI 실패 극복 힐링 타로 부적 (5 온기) */}
+          {/* 2. AI 실패 극복 힐링 타로 부적 */}
           <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08] hover:border-amber-500/40 transition-all flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0">
@@ -108,18 +109,18 @@ export function WarmthShopModal({
 
             <button
               onClick={onRedeemTarot}
-              disabled={userWarmth < 5}
+              disabled={userWarmth < WARMTH_SHOP_PRICES.TAROT_DRAW}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
-                userWarmth >= 5
-                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 active:scale-95'
+                userWarmth >= WARMTH_SHOP_PRICES.TAROT_DRAW
+                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 active:scale-95 font-black'
                   : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
               }`}
             >
-              5 온기
+              {WARMTH_SHOP_PRICES.TAROT_DRAW} 온기
             </button>
           </div>
 
-          {/* 3. 숨겨진 유사 사연 3편 열기 (6 온기) */}
+          {/* 3. 숨겨진 유사 사연 3편 열기 */}
           <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08] hover:border-pink-500/40 transition-all flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center flex-shrink-0">
@@ -133,18 +134,18 @@ export function WarmthShopModal({
 
             <button
               onClick={onRedeemSimilar}
-              disabled={userWarmth < 6}
+              disabled={userWarmth < WARMTH_SHOP_PRICES.SIMILAR_UNLOCK}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
-                userWarmth >= 6
-                  ? 'bg-pink-500 hover:bg-pink-400 text-white shadow-md shadow-pink-500/20 active:scale-95'
+                userWarmth >= WARMTH_SHOP_PRICES.SIMILAR_UNLOCK
+                  ? 'bg-pink-500 hover:bg-pink-400 text-white shadow-md shadow-pink-500/20 active:scale-95 font-black'
                   : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
               }`}
             >
-              6 온기
+              {WARMTH_SHOP_PRICES.SIMILAR_UNLOCK} 온기
             </button>
           </div>
 
-          {/* 4. 익명 온기 쪽지 발송권 3장 (10 온기) */}
+          {/* 4. 익명 온기 쪽지 발송권 3장 */}
           <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08] hover:border-sky-500/40 transition-all flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0">
@@ -158,18 +159,18 @@ export function WarmthShopModal({
 
             <button
               onClick={onRedeemNotePack}
-              disabled={userWarmth < 10}
+              disabled={userWarmth < WARMTH_SHOP_PRICES.NOTE_PACK_3}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
-                userWarmth >= 10
-                  ? 'bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/20 active:scale-95'
+                userWarmth >= WARMTH_SHOP_PRICES.NOTE_PACK_3
+                  ? 'bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/20 active:scale-95 font-black'
                   : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
               }`}
             >
-              10 온기
+              {WARMTH_SHOP_PRICES.NOTE_PACK_3} 온기
             </button>
           </div>
 
-          {/* 5. 내 사연 황금 촛불 부착 (12 온기) */}
+          {/* 5. 내 사연 황금 촛불 부착 */}
           <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08] hover:border-amber-500/40 transition-all flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0">
@@ -183,18 +184,18 @@ export function WarmthShopModal({
 
             <button
               onClick={onRedeemGoldenCandle}
-              disabled={userWarmth < 12}
+              disabled={userWarmth < WARMTH_SHOP_PRICES.GOLDEN_CANDLE}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
-                userWarmth >= 12
-                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 active:scale-95'
+                userWarmth >= WARMTH_SHOP_PRICES.GOLDEN_CANDLE
+                  ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 active:scale-95 font-black'
                   : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
               }`}
             >
-              12 온기
+              {WARMTH_SHOP_PRICES.GOLDEN_CANDLE} 온기
             </button>
           </div>
 
-          {/* 6. VIP 히든 ASMR '설원 자작나무 숲' 24시간 청취권 (20 온기) */}
+          {/* 6. VIP 히든 ASMR '설원 자작나무 숲' 24시간 청취권 */}
           <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08] hover:border-teal-500/40 transition-all flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center flex-shrink-0">
@@ -211,14 +212,14 @@ export function WarmthShopModal({
 
             <button
               onClick={onRedeemHiddenSound}
-              disabled={userWarmth < 20}
+              disabled={userWarmth < WARMTH_SHOP_PRICES.HIDDEN_SOUND}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
-                userWarmth >= 20
-                  ? 'bg-teal-500 hover:bg-teal-400 text-neutral-950 shadow-md shadow-teal-500/20 active:scale-95'
+                userWarmth >= WARMTH_SHOP_PRICES.HIDDEN_SOUND
+                  ? 'bg-teal-500 hover:bg-teal-400 text-neutral-950 shadow-md shadow-teal-500/20 active:scale-95 font-black'
                   : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
               }`}
             >
-              20 온기
+              {WARMTH_SHOP_PRICES.HIDDEN_SOUND} 온기
             </button>
           </div>
         </div>

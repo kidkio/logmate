@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Ticket, Sparkles, Check, X, ShieldCheck, Zap, Flame, CreditCard, Lock } from 'lucide-react';
 import { PASS_PLANS, requestTossPayment } from '@/lib/tossPayments';
 import { useAuth } from '@/context/AuthContext';
+import { WARMTH_SHOP_PRICES } from '@/lib/warmthSystem';
 
 interface PassPurchaseModalProps {
   isOpen: boolean;
@@ -189,7 +190,7 @@ export function PassPurchaseModal({
           </div>
 
           {/* 온기 무료 교환 링크 안내 */}
-          {userWarmth >= 25 && onOpenWarmthShop && (
+          {userWarmth >= WARMTH_SHOP_PRICES.PASS_1DAY && onOpenWarmthShop && (
             <div className="pt-1 text-center">
               <button
                 type="button"
@@ -200,7 +201,7 @@ export function PassPurchaseModal({
                 className="text-[11px] text-amber-300 hover:text-amber-200 underline underline-offset-2 flex items-center justify-center gap-1 mx-auto"
               >
                 <Flame className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span>내 보유 온기 25개로 1일권 무료 교환하기 ➔</span>
+                <span>내 보유 온기 {WARMTH_SHOP_PRICES.PASS_1DAY}개로 1일권 무료 교환하기 ➔</span>
               </button>
             </div>
           )}

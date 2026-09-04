@@ -146,10 +146,21 @@ const RANK_DEFINITIONS: RankDefinition[] = [
   },
 ];
 
-// 레벨별 필요 최소 온기 계산 공식 (Lv.1: 0 ~ Lv.100: ~5,240)
+// 온기 상점 혜택별 소모 온기 가격표 (경제 밸런스 상향 조정)
+export const WARMTH_SHOP_PRICES = {
+  PASS_1DAY: 150,        // 광고 없는 1일 이용권 (기존 25 -> 150)
+  TAROT_DRAW: 30,        // AI 실패 극복 힐링 타로 부적 (기존 5 -> 30)
+  SIMILAR_UNLOCK: 40,    // 숨겨진 공감 사연 3편 즉시 열기 (기존 6 -> 40)
+  NOTE_PACK_3: 60,       // 익명 온기 쪽지 발송권 3장 (기존 10 -> 60)
+  GOLDEN_CANDLE: 80,     // 내 사연에 황금 촛불 부착 (기존 12 -> 80)
+  HIDDEN_SOUND: 120,     // VIP 히든 ASMR 설원 24시간 청취권 (기존 20 -> 120)
+} as const;
+
+// 레벨별 필요 최소 온기 계산 공식 (Lv.1: 0 ~ Lv.100: ~53,500 대확장)
+// 공식: 15 * (level - 1)^1.78
 export function getMinWarmthForLevel(level: number): number {
   if (level <= 1) return 0;
-  return Math.round(2.6 * Math.pow(level - 1, 1.66));
+  return Math.round(15 * Math.pow(level - 1, 1.78));
 }
 
 // 1부터 100까지 100개 레벨 자동 생성

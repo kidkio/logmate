@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, RefreshCw, Heart } from 'lucide-react';
+import { WARMTH_SHOP_PRICES } from '@/lib/warmthSystem';
 
 interface TarotCard {
   name: string;
@@ -161,19 +162,19 @@ export function TarotModal({
           {onDrawAgain && (
             <button
               onClick={() => {
-                if (userWarmth < 5) return;
+                if (userWarmth < WARMTH_SHOP_PRICES.TAROT_DRAW) return;
                 onDrawAgain();
                 drawRandomCard();
               }}
-              disabled={userWarmth < 5}
+              disabled={userWarmth < WARMTH_SHOP_PRICES.TAROT_DRAW}
               className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                userWarmth >= 5
+                userWarmth >= WARMTH_SHOP_PRICES.TAROT_DRAW
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 active:scale-95'
                   : 'bg-white/[0.04] text-slate-500 border border-white/5 cursor-not-allowed'
               }`}
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>다시 뽑기 (5 온기)</span>
+              <span>다시 뽑기 ({WARMTH_SHOP_PRICES.TAROT_DRAW} 온기)</span>
             </button>
           )}
 
