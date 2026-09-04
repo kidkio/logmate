@@ -98,7 +98,7 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
   const [isBlessingClaimedToday, setIsBlessingClaimedToday] = useState<boolean>(false);
   const [showBlessingModal, setShowBlessingModal] = useState<boolean>(false);
 
-  // 유저 변경 시 해당 유저의 온기/레벨/쿨타임/부스터/축복수령여부 즉시 재동기화
+  // 유저 변경 시 해당 유저의 온기/레벨/쿨타임/부스터/축복수령여부/해금사연 즉시 재동기화
   useEffect(() => {
     const stored = getStoredWarmth(user?.id);
     setWarmthProgress(calculateWarmthProgress(stored.lifetime, stored.spendable));
@@ -107,7 +107,22 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
     const blessing = getTodayBlessing();
     setTodayBlessing(blessing);
     setIsBlessingClaimedToday(isBlessingClaimed(blessing.id, user?.id));
-  }, [user?.id]);
+
+    if (typeof window !== 'undefined') {
+      try {
+        const unlockedKey = `logmate_unlocked_stories_${user?.id || deviceId || 'guest'}`;
+        const storedStories = localStorage.getItem(unlockedKey);
+        if (storedStories) {
+          const parsed = JSON.parse(storedStories);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setUnlockedFailures(parsed);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse unlocked stories in lounge:', e);
+      }
+    }
+  }, [user?.id, deviceId]);
 
   // 1초 주기로 쿨타임 및 피버 부스터 카운트다운 갱신
   useEffect(() => {
@@ -1431,6 +1446,8 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
         isOpen={isWarmthShopOpen}
         onClose={() => setIsWarmthShopOpen(false)}
         userWarmth={warmthProgress.spendableWarmth}
+        unlockedCount={unlockedFailures.length}
+        onOpenUnlockedModal={() => setIsUnlockedModalOpen(true)}
         onRedeemPass={() => {
           const res = spendWarmth(WARMTH_SHOP_PRICES.PASS_1DAY, user?.id);
           if (!res.success) return;
@@ -1460,28 +1477,51 @@ export function MidnightLoungeTab({ user, deviceId, onNavigateTab }: MidnightLou
           setWarmthProgress(calculateWarmthProgress(updated.lifetime, updated.spendable));
           setIsWarmthShopOpen(false);
 
-          // 실제 숨겨진 공감 사연 3편 즉시 로드
+          // 실제 숨겨진 공감 사연 3편 누적 로드
           try {
+            const unlockedKey = `logmate_unlocked_stories_${user?.id || deviceId || 'guest'}`;
+            let currentUnlocked: Failure[] = [];
+            if (typeof window !== 'undefined') {
+              try {
+                const stored = localStorage.getItem(unlockedKey);
+                if (stored) {
+                  const parsed = JSON.parse(stored);
+                  if (Array.isArray(parsed)) currentUnlocked = parsed;
+                }
+              } catch {}
+            }
+
             const params = new URLSearchParams();
             if (deviceId) params.set('deviceId', deviceId);
             if (user?.id) params.set('userId', user.id);
+            if (currentUnlocked.length > 0) {
+              params.set('excludeIds', currentUnlocked.map((f) => f.id).join(','));
+            }
 
             const apiRes = await fetch(`/api/failures/unlocked-similar?${params.toString()}`);
             const data = await apiRes.json();
             if (data.success && data.unlockedFailures && data.unlockedFailures.length > 0) {
-              setUnlockedFailures(data.unlockedFailures);
+              const existingIds = new Set(currentUnlocked.map((f) => f.id));
+              const newlyAdded = data.unlockedFailures.filter((f: Failure) => !existingIds.has(f.id));
+              const updatedList = [...currentUnlocked, ...newlyAdded];
+              setUnlockedFailures(updatedList);
               setIsUnlockedModalOpen(true);
               if (typeof window !== 'undefined') {
-                const unlockedKey = `logmate_unlocked_stories_${user?.id || deviceId || 'guest'}`;
-                localStorage.setItem(unlockedKey, JSON.stringify(data.unlockedFailures));
+                localStorage.setItem(unlockedKey, JSON.stringify(updatedList));
               }
-              setToastMessage('🔓 숨겨진 공감 사연 3편이 성공적으로 해금되었습니다!');
+              setToastMessage(`🔓 새로운 공감 사연 3편이 추가 해금되었습니다! (총 ${updatedList.length}편 보유)`);
             } else {
-              setToastMessage('🔓 숨겨진 공감 사연 3편이 잠금 해제되었습니다!');
+              if (currentUnlocked.length > 0) {
+                setUnlockedFailures(currentUnlocked);
+                setIsUnlockedModalOpen(true);
+                setToastMessage(`✨ 이미 모든 공감 사연(${currentUnlocked.length}편)을 해금하셨습니다!`);
+              } else {
+                setToastMessage('아직 해금할 수 있는 사연이 없습니다.');
+              }
             }
           } catch (e) {
             console.error('Failed to fetch unlocked stories:', e);
-            setToastMessage('🔓 숨겨진 공감 사연 3편이 잠금 해제되었습니다!');
+            setToastMessage('🔓 숨겨진 공감 사연이 잠금 해제되었습니다!');
           }
           setTimeout(() => setToastMessage(null), 3500);
         }}

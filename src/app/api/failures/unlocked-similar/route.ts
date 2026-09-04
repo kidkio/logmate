@@ -16,64 +16,95 @@ export async function GET(req: NextRequest) {
       if (user) userId = user.id;
     }
 
+    const excludeParam = searchParams.get('excludeIds') || '';
+    const excludedIdSet = new Set(excludeParam ? excludeParam.split(',').filter(Boolean) : []);
+
     const todayFailure = (deviceId || userId) 
       ? await failureStore.getTodaysFailure(deviceId, userId) 
       : null;
 
     const allFailures = await failureStore.getAll(deviceId, '전체', 'popular');
-    // 본인이 작성한 글은 해금 비밀 사연 후보에서 완전히 배제
+    // 본인이 작성한 글 및 이미 해금한 글은 후보에서 완전히 배제
     const available = allFailures.filter(
-      (f) => !isFailureOwnedBy(f, deviceId, userId) && (!todayFailure || f.id !== todayFailure.id)
+      (f) =>
+        !isFailureOwnedBy(f, deviceId, userId) &&
+        (!todayFailure || f.id !== todayFailure.id) &&
+        !excludedIdSet.has(f.id)
     );
 
     let unlocked: Failure[] = [];
 
     if (todayFailure) {
-      // 오늘 작성한 실패와 유사도 계산
-      const scored = available.map((f) => {
-        const score = calculateKoreanSimilarity(
+      // 무료 기본 3편의 ID 추출 (이미 무료로 피드에 노출된 상위 3편)
+      const allEligible = allFailures.filter(
+        (f) => !isFailureOwnedBy(f, deviceId, userId) && f.id !== todayFailure.id
+      );
+      const allScored = allEligible.map((f) => ({
+        failure: f,
+        score: calculateKoreanSimilarity(
           todayFailure.category,
           todayFailure.content,
           todayFailure.tags || [],
           f.category,
           f.content,
           f.tags || []
-        );
-        return { failure: f, score };
-      });
+        ),
+      }));
+      allScored.sort((a, b) => b.score - a.score);
+      const freeTop3Ids = new Set(allScored.slice(0, 3).map((item) => item.failure.id));
 
-      scored.sort((a, b) => b.score - a.score);
+      // 남은 후보 사연 중에서 유사도 높은 순으로 신규 3편 추출
+      const candidates = available
+        .filter((f) => !freeTop3Ids.has(f.id))
+        .map((f) => ({
+          failure: f,
+          score: calculateKoreanSimilarity(
+            todayFailure.category,
+            todayFailure.content,
+            todayFailure.tags || [],
+            f.category,
+            f.content,
+            f.tags || []
+          ),
+        }));
+      candidates.sort((a, b) => b.score - a.score);
 
-      // 상위 3개(기본 무료 노출된 것) 다음의 4~6번째 유사 사연 선택
-      const nextSimilar = scored.slice(3, 6).map((item) => ({
+      unlocked = candidates.slice(0, 3).map((item) => ({
         ...item.failure,
         similarityScore: Math.round(item.score * 100),
       }));
 
-      unlocked = nextSimilar;
-
-      // 만약 4~6번째가 3개 미만이면, 동일 카테고리 또는 인기 공감 사연으로 채움
+      // 3개 미만이면 카테고리 필러로 충원
       if (unlocked.length < 3) {
-        const existingIds = new Set([todayFailure.id, ...unlocked.map((u) => u.id), ...scored.slice(0, 3).map((s) => s.failure.id)]);
-        const categoryFillers = available.filter((f) => f.category === todayFailure.category && !existingIds.has(f.id));
+        const currentPickedIds = new Set([
+          todayFailure.id,
+          ...excludedIdSet,
+          ...freeTop3Ids,
+          ...unlocked.map((u) => u.id),
+        ]);
+        const categoryFillers = available.filter(
+          (f) => f.category === todayFailure.category && !currentPickedIds.has(f.id)
+        );
         for (const f of categoryFillers) {
           if (unlocked.length >= 3) break;
           unlocked.push({ ...f, similarityScore: 88 });
-          existingIds.add(f.id);
+          currentPickedIds.add(f.id);
         }
       }
     }
 
-    // 여전히 3개 미만인 경우 (오늘 글을 아직 안 썼거나 글 수가 적을 때)
+    // 여전히 3개 미만인 경우 (전체 풀에서 충원)
     if (unlocked.length < 3) {
-      const existingIds = new Set(unlocked.map((u) => u.id));
-      if (todayFailure) existingIds.add(todayFailure.id);
-      
-      const generalFillers = available.filter((f) => !existingIds.has(f.id));
+      const currentPickedIds = new Set([
+        ...(todayFailure ? [todayFailure.id] : []),
+        ...excludedIdSet,
+        ...unlocked.map((u) => u.id),
+      ]);
+      const generalFillers = available.filter((f) => !currentPickedIds.has(f.id));
       for (const f of generalFillers) {
         if (unlocked.length >= 3) break;
         unlocked.push({ ...f, similarityScore: 85 });
-        existingIds.add(f.id);
+        currentPickedIds.add(f.id);
       }
     }
 

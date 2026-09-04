@@ -59,7 +59,8 @@ export function UnlockedSimilarModal({
 
   if (!isOpen || unlockedFailures.length === 0) return null;
 
-  const currentStory = unlockedFailures[currentIndex] || unlockedFailures[0];
+  const validIndex = Math.min(Math.max(0, currentIndex), unlockedFailures.length - 1);
+  const currentStory = unlockedFailures[validIndex] || unlockedFailures[0];
 
   const handleReactionClick = (type: ReactionType) => {
     if (!currentStory) return;
@@ -87,6 +88,12 @@ export function UnlockedSimilarModal({
 
     if (onReaction) {
       onReaction(storyId, type);
+    } else {
+      fetch('/api/reactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ failureId: storyId, deviceId: 'lounge_guest', reactionType: type }),
+      }).catch(console.error);
     }
   };
 
@@ -114,7 +121,7 @@ export function UnlockedSimilarModal({
                 온기 해금 완료 🔓
               </span>
               <h3 className="text-sm sm:text-base font-black text-slate-100">
-                숨겨진 공감 사연 3편
+                숨겨진 공감 사연 {unlockedFailures.length > 3 ? `(총 ${unlockedFailures.length}편 해금)` : '3편'}
               </h3>
             </div>
           </div>
@@ -127,21 +134,21 @@ export function UnlockedSimilarModal({
           </button>
         </div>
 
-        {/* 3편 탭 네비게이터 */}
-        <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950/80 rounded-2xl border border-white/[0.06]">
-          {unlockedFailures.slice(0, 3).map((f, idx) => (
+        {/* 누적 해금 사연 탭 네비게이터 (가로 스크롤) */}
+        <div className="flex items-center gap-1.5 p-1.5 bg-slate-950/80 rounded-2xl border border-white/[0.06] overflow-x-auto no-scrollbar scroll-smooth">
+          {unlockedFailures.map((f, idx) => (
             <button
               key={f.id || idx}
               onClick={() => setCurrentIndex(idx)}
-              className={`py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-0.5 ${
-                currentIndex === idx
-                  ? 'bg-gradient-to-r from-pink-600 to-amber-600 text-white shadow-md shadow-pink-500/30 font-black'
+              className={`py-1.5 px-3 rounded-xl text-[11px] font-bold transition-all flex-shrink-0 flex items-center gap-1.5 ${
+                validIndex === idx
+                  ? 'bg-gradient-to-r from-pink-600 to-amber-600 text-white shadow-md shadow-pink-500/30 font-black scale-[1.02]'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
               }`}
             >
-              <span>{idx + 1}번째 비밀</span>
-              <span className="text-[9px] opacity-80 truncate max-w-[80px]">
-                {f.category || '공감 사연'}
+              <span>{idx + 1}편</span>
+              <span className="text-[9px] opacity-75 max-w-[64px] truncate">
+                {f.category || '공감'}
               </span>
             </button>
           ))}
@@ -215,7 +222,7 @@ export function UnlockedSimilarModal({
         <div className="flex items-center justify-between pt-1 text-xs">
           <button
             onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-            disabled={currentIndex === 0}
+            disabled={validIndex === 0}
             className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -223,12 +230,12 @@ export function UnlockedSimilarModal({
           </button>
 
           <span className="text-[11px] font-mono text-slate-500">
-            {currentIndex + 1} / {unlockedFailures.length}
+            {validIndex + 1} / {unlockedFailures.length}
           </span>
 
           <button
             onClick={() => setCurrentIndex((prev) => Math.min(unlockedFailures.length - 1, prev + 1))}
-            disabled={currentIndex === unlockedFailures.length - 1}
+            disabled={validIndex >= unlockedFailures.length - 1}
             className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
           >
             <span>다음 사연</span>
@@ -252,7 +259,7 @@ export function UnlockedSimilarModal({
           )}
 
           <p className="text-[10px] text-slate-500 text-center">
-            *해금된 사연 3편은 오늘의 숏츠 피드에도 영구적으로 추가 합류되었습니다.
+            *해금된 사연(총 {unlockedFailures.length}편)은 오늘의 숏츠 피드에도 영구적으로 추가 합류되었습니다.
           </p>
         </div>
       </div>

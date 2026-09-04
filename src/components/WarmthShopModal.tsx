@@ -14,6 +14,8 @@ interface WarmthShopModalProps {
   onRedeemTarot: () => void;
   onRedeemNotePack: () => void;
   onRedeemHiddenSound: () => void;
+  unlockedCount?: number;
+  onOpenUnlockedModal?: () => void;
 }
 
 export function WarmthShopModal({
@@ -26,6 +28,8 @@ export function WarmthShopModal({
   onRedeemTarot,
   onRedeemNotePack,
   onRedeemHiddenSound,
+  unlockedCount,
+  onOpenUnlockedModal,
 }: WarmthShopModalProps) {
   if (!isOpen) return null;
 
@@ -127,22 +131,46 @@ export function WarmthShopModal({
                 <LockOpen className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <h4 className="text-xs font-bold text-slate-100">숨겨진 공감 사연 3편</h4>
-                <p className="text-[10px] text-slate-400 truncate">나와 가장 닮은 비밀 사연 즉시 해금</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="text-xs font-bold text-slate-100">숨겨진 공감 사연 3편</h4>
+                  {unlockedCount && unlockedCount > 0 ? (
+                    <span className="text-[9px] font-bold text-pink-300 bg-pink-950/80 px-1.5 py-0.5 rounded border border-pink-500/30">
+                      총 {unlockedCount}편 보유
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {unlockedCount && unlockedCount > 0
+                    ? '구매할 때마다 3편씩 추가 해금 (+3편)'
+                    : '나와 가장 닮은 비밀 사연 즉시 해금'}
+                </p>
               </div>
             </div>
 
-            <button
-              onClick={onRedeemSimilar}
-              disabled={userWarmth < WARMTH_SHOP_PRICES.SIMILAR_UNLOCK}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
-                userWarmth >= WARMTH_SHOP_PRICES.SIMILAR_UNLOCK
-                  ? 'bg-pink-500 hover:bg-pink-400 text-white shadow-md shadow-pink-500/20 active:scale-95 font-black'
-                  : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
-              }`}
-            >
-              {WARMTH_SHOP_PRICES.SIMILAR_UNLOCK} 온기
-            </button>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {unlockedCount && unlockedCount > 0 && onOpenUnlockedModal && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenUnlockedModal();
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-white/[0.06] hover:bg-white/[0.12] text-pink-200 border border-pink-500/30 active:scale-95 transition-all"
+                >
+                  보기
+                </button>
+              )}
+              <button
+                onClick={onRedeemSimilar}
+                disabled={userWarmth < WARMTH_SHOP_PRICES.SIMILAR_UNLOCK}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex-shrink-0 transition-all ${
+                  userWarmth >= WARMTH_SHOP_PRICES.SIMILAR_UNLOCK
+                    ? 'bg-pink-500 hover:bg-pink-400 text-white shadow-md shadow-pink-500/20 active:scale-95 font-black'
+                    : 'bg-white/[0.05] text-slate-500 border border-white/[0.05] cursor-not-allowed'
+                }`}
+              >
+                {WARMTH_SHOP_PRICES.SIMILAR_UNLOCK} 온기
+              </button>
+            </div>
           </div>
 
           {/* 4. 익명 온기 쪽지 발송권 3장 */}

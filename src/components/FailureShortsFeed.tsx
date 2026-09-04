@@ -849,15 +849,24 @@ export function FailureShortsFeed({
             const targetUid = myTodayFailure?.userId || userId;
             if (targetDevId) params.set('deviceId', targetDevId);
             if (targetUid) params.set('userId', targetUid);
+
+            // 이미 해금한 사연 ID 제외 요청 파라미터 전달
+            if (unlockedBonusFailures.length > 0) {
+              params.set('excludeIds', unlockedBonusFailures.map((f) => f.id).join(','));
+            }
+
             const res = await fetch(`/api/failures/unlocked-similar?${params.toString()}`);
             const data = await res.json();
             if (data.success && data.unlockedFailures?.length > 0) {
-              setUnlockedBonusFailures(data.unlockedFailures);
+              const existingIds = new Set(unlockedBonusFailures.map((f) => f.id));
+              const newlyAdded = data.unlockedFailures.filter((f: Failure) => !existingIds.has(f.id));
+              const updated = [...unlockedBonusFailures, ...newlyAdded];
+              setUnlockedBonusFailures(updated);
               setIsUnlockedModalOpen(true);
               if (typeof window !== 'undefined') {
-                localStorage.setItem(storageKey, JSON.stringify(data.unlockedFailures));
+                localStorage.setItem(storageKey, JSON.stringify(updated));
               }
-              setToastMessage('🎉 보상 획득! 숨겨진 공감 사연 3편이 즉시 열렸습니다 🔓');
+              setToastMessage(`🎉 보상 획득! 숨겨진 공감 사연 3편이 즉시 열렸습니다 🔓 (총 ${updated.length}편 보유)`);
             } else {
               setToastMessage('🎉 보상 획득! 추가 사연을 불러왔습니다.');
             }
